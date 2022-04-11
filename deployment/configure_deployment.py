@@ -17,6 +17,7 @@ print(f"User Email : {user.email}")
 bucket_name = os.environ['GCS_BUCKET']
 storage_client = storage.Client()
 
+
 try:
     bucket = storage_client.get_bucket(bucket_name)
     # Restrictions set by google cloud...
@@ -28,15 +29,14 @@ try:
 
     if bucket.location != 'US-CENTRAL1':
         raise ValueError(
-            f"Bucket must be located in US-CENTRAL-1. Provided bucket `{bucket_name}` is located in `{bucket.location}`"
+            f"Bucket must be located in US-CENTRAL1. Provided bucket `{bucket_name}` is located in `{bucket.location}`"
         )
     print(f"Deployment will use GCS bucket: `{bucket_name}`")
 except NotFound:
     print(f"Creating new bucket with name : `{bucket_name}`")
     bucket = storage_client.bucket(bucket_name)
     bucket.storage_class = "STANDARD"
-    bucket.location_type = 'region'
-    bucket.location = 'US-CENTRAL-1'
+    bucket.location = 'US-CENTRAL1'
     new_bucket = storage_client.create_bucket(bucket)
     print(f"Created GCS bucket: `{bucket_name}`")
 

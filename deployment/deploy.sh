@@ -60,7 +60,7 @@ docker-compose build
 docker-compose push
 
 # Configure storage and secrets
-docker-compose up deployment_config
+docker-compose run deployment_config
 
 # Create Ingress
 gcloud compute firewall-rules create $FIREWALL_NAME \
