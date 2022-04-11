@@ -1,8 +1,6 @@
 ## ETl / Train / Deploy / Analyze using GCP and Labelbox
 
 
-# You need GCLOUD installed and configured
-
 ### Overview
 
 Run ETL jobs, train models, deploy models, and track model performance all from a single service. The code deploys a service called the `coordinator` to google cloud. It exposes a rest api for launching various pipelines. The coordinator only has to be deployed once and then will be controllable via the labelbox web app (WIP). This project is designed to be easily extended for custom workflows. However, we will support the following models with no additional configuration required:
