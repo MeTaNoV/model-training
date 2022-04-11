@@ -22,7 +22,7 @@ Run ETL jobs, train models, deploy models, and track model performance all from 
 
 Deploy the coordinator service on port 8000
 
-1. Set the following env vars locally:
+1. Create a .env file to keep track of the following env vars (copy .env.example to get started):
     - `DEPLOYMENT_NAME`
         - This is the name that all of the google resources will use. This will enable multiple deployments. E.g. prod-training-service or dev-training-service.
     - `GCS_BUCKET`
@@ -36,9 +36,15 @@ Deploy the coordinator service on port 8000
     - `GOOGLE_SERVICE_ACCOUNT`
         - Google service account. Will have the following format: `<name>@<project>.iam.gserviceaccount.com`.
     - `LABELBOX_API_KEY`
-2. Deploy the service
+2. Once the .env file has the correct values, load the env vars by running `source .env`
+    - If you update the .env file, make sure to re-run `source .env` to load the latest env vars.
+3. Deploy the service
     - To the cloud: `./deployment/deploy.sh`
     - Locally: `./run.sh`
+4. Test that it is running with:
+    - curl http://ip:8000/ping 
+    - ip will be `0.0.0.0` for a local deployment and the remote ip will be printed to the console when you run the deployment script.
+    - The server will respond with pong if the deployment was successful
 
 
 ### Managing training deployments
