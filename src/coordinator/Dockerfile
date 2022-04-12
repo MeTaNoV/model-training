@@ -1,5 +1,10 @@
-FROM python:3.9
+FROM python:3.9-slim-buster
 RUN apt-get update -y && apt-get install -y libgl1-mesa-glx
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip3 install -r requirements.txt
+
 ARG GCS_BUCKET
 ENV GCS_BUCKET=$GCS_BUCKET
 
@@ -12,9 +17,6 @@ ENV GOOGLE_SERVICE_ACCOUNT=$GOOGLE_SERVICE_ACCOUNT
 ARG DEPLOYMENT_NAME
 ENV DEPLOYMENT_NAME=$DEPLOYMENT_NAME
 
-WORKDIR /app
-COPY requirements.txt .
-RUN pip3 install -r requirements.txt
 COPY . .
 
 ENTRYPOINT [ "python3", "coordinator.py"]
