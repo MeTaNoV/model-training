@@ -1,4 +1,4 @@
-## ETl / Train / Deploy / Analyze using GCP and Labelbox
+## ETL / Train / Deploy / Analyze using GCP and Labelbox
 
 
 ### Overview
