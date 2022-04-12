@@ -43,7 +43,7 @@ Run ETL jobs, train models, deploy models, and track model performance all from 
         gcloud iam service-accounts keys create $GOOGLE_APPLICATION_CREDENTIALS \
             --iam-account=ACCOUNT_NAME@PROJECT_ID.iam.gserviceaccount.com
         ```
-4. Connect docker to GCR by running `gcloud auth configure-docker``
+4. Connect docker to GCR by running `gcloud auth configure-docker`
 
 
 
