@@ -76,7 +76,7 @@ def process_label(label: Label, bucket: Bucket) -> str:
     bounding_box_annotations = []
     # TODO: Only download if the label has annotations
     # When this is only necessary since we don't have media attributes in the export yet.
-    downsample_factor = 2
+    downsample_factor = 4
     image, (w, h) = download_image(label.data.url, 1. / downsample_factor,
                                    1. / downsample_factor)
     image_bytes = image_to_bytes(image)

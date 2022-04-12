@@ -1,7 +1,7 @@
 opencv-python-headless==4.5.5.62
 fastapi[all]
 google-cloud-storage
-google-cloud-aiplatform
+google-cloud-aiplatform==1.11.0
 google-cloud-secret-manager
 labelbox[data]
 ndjson
