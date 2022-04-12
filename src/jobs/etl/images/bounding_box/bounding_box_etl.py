@@ -151,10 +151,9 @@ def bounding_box_etl(lb_client: Client, model_run_id: str, bucket) -> str:
 
 
 def main(model_run_id: str, gcs_bucket: str, gcs_key: str):
-    gcs_client = storage.Client(project=os.environ['GOOGLE_PROJECT'],
-                                enable_experimental=True)
+    gcs_client = storage.Client(project=os.environ['GOOGLE_PROJECT'])
     lb_client = Client(api_key=_labelbox_api_key,
-                       endpoint='https://api.labelbox.com/_gql')
+                       endpoint='https://api.labelbox.com/_gql', enable_experimental=True)
     bucket = gcs_client.bucket(gcs_bucket)
     nowgmt = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
     gcs_key = gcs_key or f'etl/bounding-box/{nowgmt}.jsonl'
