@@ -54,16 +54,23 @@ services:
     build:
       context: ./src/jobs/etl/text/ner/
       dockerfile: Dockerfile
+      args:
+        DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/ner_etl
 
   image_classification_etl:
     build:
       context: ./src/jobs/etl/images/classification/
       dockerfile: Dockerfile
+      args:
+        DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/image_classification_etl
+
 
   text_classification_etl:
     build:
       context: ./src/jobs/etl/text/classification/
       dockerfile: Dockerfile
+      args:
+        DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/text_classification_etl
