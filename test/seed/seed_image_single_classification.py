@@ -91,6 +91,5 @@ labels = [
     label.uid
     for label in list(LBV1Converter.deserialize(json_labels))[:max_labels]
 ]
-lb_model_run = lb_model.create_model_run(f"0.0.0")
 lb_model_run.upsert_labels(labels)
 print("Successfully created Model and ModelRun")
