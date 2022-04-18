@@ -74,3 +74,19 @@ services:
       args:
         DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/text_classification_etl
+
+  knn_classification_train:
+    build:
+      context: ./src/jobs/custom_models/knn_classifier/train/
+      dockerfile: Dockerfile
+      args:
+        DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
+    image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/knn_classification_train
+
+  knn_classification_predict:
+    build:
+      context: ./src/jobs/custom_models/knn_classifier/predict/
+      dockerfile: Dockerfile
+      args:
+        DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
+    image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/knn_classification_predict

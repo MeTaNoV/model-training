@@ -10,6 +10,8 @@ from pipelines.images.bounding_box import BoundingBoxPipeline
 from pipelines.types import Pipeline
 from pipelines.text.ner import NERPipeline
 from pipelines.text.classification import TextSingleClassificationPipeline, TextMultiClassificationPipeline
+from pipelines.images.custom_classification import ImageKNNClassificationPipeline
+
 
 service_account = os.environ["GOOGLE_SERVICE_ACCOUNT"]
 google_cloud_project = os.environ['GOOGLE_PROJECT']
@@ -46,7 +48,7 @@ class Pipelines(TypedDict):
     image_multi_classification: Pipeline
     text_single_classification: Pipeline
     text_multi_classification: Pipeline
-
+    image_knn_classification: Pipeline
 
 _common_params = [
     _deployment_name, _labelbox_api_key, _gcs_bucket, service_account,
@@ -65,13 +67,16 @@ pipelines: Pipelines = {
         TextSingleClassificationPipeline(*_common_params),
     'text_multi_classification':
         TextMultiClassificationPipeline(*_common_params),
+    'image_knn_classification':
+        ImageKNNClassificationPipeline(*_common_params),
 }
 
 PipelineName = Union[Literal['bounding_box', 'ner',
                              'image_single_classification',
                              'image_multi_classification',
                              'text_single_classification',
-                             'text_multi_classification']]
+                             'text_multi_classification',
+                             'image_knn_classification']]
 
 if set(PipelineName.__args__) != set(pipelines.keys()):
     raise ValueError(

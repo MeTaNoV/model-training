@@ -135,8 +135,8 @@ def image_classification_etl(lb_client: Client, model_run_id: str,
     fn = process_multi_classification_label if multi else process_single_classification_label
     with ThreadPoolExecutor(max_workers=8) as exc:
         training_data_futures = [
-            exc.submit(fn, label, content['Data Split'], bucket)
-            for label, content in label_data
+            exc.submit(fn, label, bucket)
+            for label in label_data
         ]
         training_data = [future.result() for future in training_data_futures]
         training_data = [
