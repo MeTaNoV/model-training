@@ -118,10 +118,12 @@ def main(gcs_bucket: str, etl_uri: str, model_file: str, predictions_file: str):
     etl_consume = etl
     chunk_size = 100
     while etl_consume:
-        images = [get_img_from_line(bucket, line) for line in etl[:chunk_size]]
+        images = [get_img_from_line(bucket, line)
+                  for line in etl_consume[:chunk_size]]
         embeddings = embeddings + compute_embeddings(images)
         etl_consume = etl_consume[chunk_size:]
 
+    embeddings = np.asarray(embeddings, dtype=np.float64)
     predictions = classifier.predict(embeddings)
     dist, ind = classifier.kneighbors(embeddings, n_neighbors=1,
                                       return_distance=True)
