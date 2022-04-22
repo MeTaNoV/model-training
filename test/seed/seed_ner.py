@@ -1,9 +1,10 @@
 import uuid
+
 from datasets import load_dataset
-from labelbox import Client, LabelingFrontend
-from labelbox.schema.annotation_import import LabelImport
-from labelbox.schema.ontology import OntologyBuilder, Tool
 from tqdm import tqdm
+
+from labelbox import Client, LabelImport, OntologyBuilder, Tool
+
 
 ENTITIES = {
     0: '[PAD]',
@@ -17,24 +18,26 @@ ENTITIES = {
     8: 'I-MISC'
 }
 
-
-def setup_project(client):
-    project = client.create_project(name="ner_training_project")
-    dataset = client.create_dataset(name="net_training_dataset")
+def create_ontology(client):
     ontology_builder = OntologyBuilder(tools=[
         Tool(tool=Tool.Type.NER, name=name)
         for name in list(ENTITIES.values())[1:]
     ])
-    editor = next(
-        client.get_labeling_frontends(where=LabelingFrontend.name == 'editor'))
-    project.setup(editor, ontology_builder.asdict())
-    project.datasets.connect(dataset)
-    feature_schema_lookup = {
+    return client.create_ontology("ner_ontology", ontology_builder.asdict())
+
+def get_feature_schema_lookup(ontology):
+    return {
         tool.name: tool.feature_schema_id
-        for tool in project.ontology().tools()
+        for tool in ontology.tools()
     }
 
-    return project, dataset, feature_schema_lookup
+def setup_project(client):
+    project = client.create_project(name="ner_training_project")
+    dataset = client.create_dataset(name="net_training_dataset")
+    ontology = create_ontology(client)
+    project.setup_editor(ontology)
+    project.datasets.connect(dataset)
+    return project, dataset, ontology
 
 
 def generate_label(feature_schema_lookup, tokens, ner_tags):
@@ -75,12 +78,6 @@ def create_labels(feature_schema_lookup):
     return label_data
 
 
-def upload_to_labelbox(client, project, upload_annotations):
-    print(f"Uploading {len(upload_annotations)} annotations.")
-    job = LabelImport.create_from_objects(client, project.uid,
-                                          str(uuid.uuid4()), upload_annotations)
-    job.wait_until_done()
-    print("Upload Errors:", job.errors)
 
 
 def assign_data_row_ids(client, labels):
@@ -100,9 +97,9 @@ def flatten_labels(labels):
     ]
 
 
-def main():
-    client = Client()
-    project, dataset, feature_schema_lookup = setup_project(client)
+def main(client):
+    project, dataset, ontology = setup_project(client)
+    feature_schema_lookup = get_feature_schema_lookup(ontology)
     labels = create_labels(feature_schema_lookup)
     task = dataset.create_data_rows([{
         'row_data': data['text'],
@@ -111,21 +108,20 @@ def main():
     task.wait_till_done()
     assign_data_row_ids(client, labels)
     annotations = flatten_labels(labels)
-    upload_to_labelbox(client, project, annotations)
-
-    lb_model = client.create_model(name=f"{project.name}-model",
-                                   ontology_id=project.ontology().uid)
-
-    #iterate over every 2k labels to upload
-    max_labels = 2000
-    labels = [
-        label.uid for label in list(project.label_generator())[:max_labels]
-    ]
-    lb_model_run = lb_model.create_model_run(f"0.0.0")
-    lb_model_run.upsert_labels(labels)
-
-    print("Successfully created Model and ModelRun", lb_model_run.uid)
+    print(f"Uploading {len(annotations)} annotations.")
+    job = LabelImport.create_from_objects(client, project.uid,
+                                          str(uuid.uuid4()), annotations)
+    job.wait_until_done()
+    errors = job.errors
+    if not len(errors):
+        print("Successfully uploaded")
+        lb_model = client.create_model(name=f"ner_model",
+                            ontology_id=project.ontology().uid)
+        print(f"Successfully seeded data and created model. Setup a model run here: https://app.labelbox.com/models/{lb_model.uid}")
+    else:
+        print("Upload contained errors: ", errors)
 
 
 if __name__ == '__main__':
-    main()
+    client = Client()
+    main(client)
