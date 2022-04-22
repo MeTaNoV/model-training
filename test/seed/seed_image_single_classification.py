@@ -1,95 +1,94 @@
 import uuid
 from io import BytesIO
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from PIL import Image
 from tqdm import tqdm
 import tensorflow_datasets as tfds
 
-from labelbox import Client
-from labelbox.schema.annotation_import import LabelImport
-from labelbox.schema.labeling_frontend import LabelingFrontend
-from labelbox.schema.ontology import Classification, OntologyBuilder, Option
-from labelbox.data.serialization import LBV1Converter
-
-client = Client()
-
-CLASS_MAPPINGS = {0: 'cat', 1: 'dog'}
+from labelbox import Client, LabelImport , Classification, OntologyBuilder, Option
 
 
-def setup_project(client):
-    project = client.create_project(name="image_single_classification_project")
-    dataset = client.create_dataset(name="image_single_classification_dataset")
+def create_ontology(client):
     ontology_builder = OntologyBuilder(classifications=[
         Classification(Classification.Type.RADIO,
                        "dog or cat",
                        options=[Option("dog"), Option("cat")]),
     ])
-    editor = next(
-        client.get_labeling_frontends(where=LabelingFrontend.name == 'editor'))
-    project.setup(editor, ontology_builder.asdict())
-    project.datasets.connect(dataset)
-    classification = project.ontology().classifications()[0]
-    feature_schema_lookup = {
+    return client.create_ontology("image_single_classification_ontology", ontology_builder.asdict())
+
+def get_feature_schema_lookup(ontology):
+    classification = ontology.classifications()[0]
+    return  {
         'classification': classification.feature_schema_id,
         'options': {
             option.value: option.feature_schema_id
             for option in classification.options
         }
     }
-    return project, dataset, feature_schema_lookup
 
+def setup_project(client):
+    project = client.create_project(name="image_single_classification_project")
+    dataset = client.create_dataset(name="image_single_classification_dataset")
+    ontology = create_ontology(client)
+    project.setup_editor(ontology)
+    project.datasets.connect(dataset)
+    return project, dataset, ontology
 
-ds = tfds.load('cats_vs_dogs', split='train')
-annotations = []
-max_examples = 350
-project, dataset, feature_schema_lookup = setup_project(client)
-for idx, example in tqdm(enumerate(ds.as_numpy_iterator())):
-    if idx > max_examples:
-        break
-
+def generate_annotation(dataset, example, class_mappings, feature_schema_lookup):
     im_bytes = BytesIO()
     Image.fromarray(example['image']).save(im_bytes, format="jpeg")
     uri = client.upload_data(content=im_bytes.getvalue(),
-                             filename=f"{uuid.uuid4()}.jpg")
+                                filename=f"{uuid.uuid4()}.jpg")
     data_row = dataset.create_data_row(row_data=uri)
-    annotations.append({
-        "uuid": str(uuid.uuid4()),
-        "schemaId": feature_schema_lookup['classification'],
-        "dataRow": {
-            "id": data_row.uid
-        },
-        "answer": {
-            "schemaId":
-                feature_schema_lookup['options']
-                [CLASS_MAPPINGS[example['label']]]
+    return {
+            "uuid": str(uuid.uuid4()),
+            "schemaId": feature_schema_lookup['classification'],
+            "dataRow": {
+                "id": data_row.uid
+            },
+            "answer": {
+                "schemaId":
+                    feature_schema_lookup['options']
+                    [class_mappings[example['label']]]
+            }
         }
-    })
 
-print(f"Uploading {len(annotations)} annotations.")
-job = LabelImport.create_from_objects(client, project.uid, str(uuid.uuid4()),
-                                      annotations)
-job.wait_until_done()
-print("Upload Errors:", job.errors)
+def generate_annotations(dataset, feature_schema_lookup):
+    ds = tfds.load('cats_vs_dogs', split='train')
+    class_mappings = {0: 'cat', 1: 'dog'}
+    annotations = []
+    max_examples = 350
+    futures = []
+    with ThreadPoolExecutor() as exc:
+        for idx, example in enumerate(ds.as_numpy_iterator()):
+            if idx > max_examples:
+                break
+            futures.append(exc.submit(generate_annotation, dataset, example, class_mappings, feature_schema_lookup))
+        for f in tqdm(as_completed(futures)):
+            annotations.append(f.result())
+    return annotations
 
-lb_model = client.create_model(name=f"{project.name}-model",
-                               ontology_id=project.ontology().uid)
-lb_model_run = lb_model.create_model_run("0.0.0")
+def main(client):
+    project, dataset, ontology = setup_project(client)
+    feature_schema_lookup = get_feature_schema_lookup(ontology)
+    annotations = generate_annotations(dataset, feature_schema_lookup)
 
-#iterate over every 2k labels to upload
-max_labels = 2000
-current_label_count = 0
-model_run_iterator = 0
-labels = []
+    print(f"Uploading {len(annotations)} annotations.")
+    job = LabelImport.create_from_objects(client, project.uid, str(uuid.uuid4()),
+                                          annotations)
+    job.wait_until_done()
+    errors = job.errors
+    if not len(errors):
+        print("Successfully uploaded")
+        lb_model = client.create_model(name=f"image_single_classification_model",
+                            ontology_id=project.ontology().uid)
+        print(f"Successfully seeded data and created model. Setup a model run here: https://app.labelbox.com/models/{lb_model.uid}")
+    else:
+        print("Upload contained errors: ", errors)
 
-json_labels = project.export_labels(download=True)
-#slightly diff than other seeds bc needs to infer media type
-for row in json_labels:
-    row['media_type'] = 'image'
 
-max_labels = 2000
-labels = [
-    label.uid
-    for label in list(LBV1Converter.deserialize(json_labels))[:max_labels]
-]
-lb_model_run.upsert_labels(labels)
-print("Successfully created Model and ModelRun")
+if __name__ == '__main__':
+    client = Client()
+    main(client)
+

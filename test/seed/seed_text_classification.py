@@ -1,88 +1,101 @@
-from labelbox.schema.annotation_import import LabelImport, MEAPredictionImport
-from labelbox.schema.labeling_frontend import LabelingFrontend
-from labelbox.schema.ontology import Classification, OntologyBuilder, Option
-import tensorflow_datasets as tfds
-from PIL import Image
-from io import BytesIO
-from labelbox import Client
-from tqdm import tqdm
-import uuid
 from uuid import uuid4
 
-client = Client()
+import tensorflow_datasets as tfds
+from tqdm import tqdm
+
+from labelbox import Client, LabelImport, Classification, OntologyBuilder, Option
+
+
 
 CLASS_MAPPINGS = {0: 'negative', 1: 'positive'}
 
 
-def setup_project(client):
-    project = client.create_project(name="text_single_classification_project")
-    dataset = client.create_dataset(name="text_single_classification_dataset")
-    ontology_builder = OntologyBuilder(classifications=[
-        Classification(Classification.Type.RADIO,
-                       "positive or negative",
-                       options=[Option("positive"),
-                                Option("negative")]),
-    ])
-    editor = next(
-        client.get_labeling_frontends(where=LabelingFrontend.name == 'editor'))
-    project.setup(editor, ontology_builder.asdict())
-    project.datasets.connect(dataset)
-    classification = project.ontology().classifications()[0]
-    feature_schema_lookup = {
+def get_feature_schema_lookup(ontology):
+    classification = ontology.classifications()[0]
+    return {
         'classification': classification.feature_schema_id,
         'options': {
             option.value: option.feature_schema_id
             for option in classification.options
         }
     }
-    return project, dataset, feature_schema_lookup
+
+def create_ontology(client):
+    ontology_builder = OntologyBuilder(classifications=[
+        Classification(Classification.Type.RADIO,
+                       "positive or negative",
+                       options=[Option("positive"),
+                                Option("negative")]),
+    ])
+    return client.create_ontology("text_single_classification_ontology", ontology_builder.asdict())
 
 
-ds = tfds.load('imdb_reviews', split='train')
-labels = {}
-data_row_args = []
-project, dataset, feature_schema_lookup = setup_project(client)
-for idx, example in tqdm(enumerate(ds.as_numpy_iterator())):
-    external_id = str(uuid4())
-    data_row_args.append({
-        'row_data': example['text'].decode('utf8'),
-        'external_id': external_id
-    })
-    labels[external_id] = {
-        "uuid": str(uuid.uuid4()),
-        "schemaId": feature_schema_lookup['classification'],
-        "dataRow": {
-            "id": None
-        },
-        "answer": {
-            "schemaId":
-                feature_schema_lookup['options']
-                [CLASS_MAPPINGS[example['label']]]
+def setup_project(client):
+    project = client.create_project(name="text_single_classification_project")
+    dataset = client.create_dataset(name="text_single_classification_dataset")
+    project.datasets.connect(dataset)
+    ontology = create_ontology(client)
+    project.setup_editor(ontology)
+    return project, dataset, ontology
+
+
+def assign_data_row_ids_to_label_data(client, seed_data):
+    for external_id, data_row_ids in tqdm(
+            client.get_data_row_ids_for_external_ids(list(seed_data.keys())).items()):
+        data_row_id = data_row_ids[0]
+        seed_data[external_id]['label_data']['dataRow'] = {'id': data_row_id}
+
+
+def process_source_data(feature_schema_lookup):
+    source_data = tfds.load('imdb_reviews', split='train')
+    seed_data = {}
+
+    for idx, example in enumerate(tqdm(source_data.as_numpy_iterator())):
+        if idx == 2000:
+            break
+
+        external_id = str(uuid4())
+        seed_data[external_id] = {
+            'row_data' : example['text'].decode('utf8'),
+            'label_data' : {
+            "uuid": str(uuid4()),
+            "schemaId": feature_schema_lookup['classification'],
+            "dataRow": {
+                "id": None
+            },
+            "answer": {
+                "schemaId":
+                    feature_schema_lookup['options']
+                    [CLASS_MAPPINGS[example['label']]]
+            }
         }
     }
+    return seed_data
 
-task = dataset.create_data_rows(data_row_args)
-task.wait_till_done()
 
-for external_id, data_row_ids in tqdm(
-        client.get_data_row_ids_for_external_ids(list(labels.keys())).items()):
-    data = labels[external_id]
-    data_row_id = data_row_ids[0]
-    labels[external_id]['dataRow'] = {'id': data_row_id}
+def main(client):
+    project, dataset, ontology = setup_project(client)
+    feature_schema_lookup = get_feature_schema_lookup(ontology)
+    seed_data = process_source_data(feature_schema_lookup)
+    task = dataset.create_data_rows([{'external_id' : k, 'row_data' : v['row_data']} for k,v in seed_data.items()])
+    task.wait_till_done()
+    assign_data_row_ids_to_label_data(client, seed_data)
 
-annotations = list(labels.values())
-
-print(f"Uploading {len(annotations)} annotations.")
-job = LabelImport.create_from_objects(client, project.uid, str(uuid.uuid4()),
-                                      annotations)
-job.wait_until_done()
-print("Upload Errors:", job.errors)
-
-lb_model = client.create_model(name=f"{project.name}-model",
+    annotations =  [label_seed_data['label_data'] for label_seed_data in seed_data.values() ]
+    print(f"Uploading {len(annotations)} annotations.")
+    job = LabelImport.create_from_objects(client, project.uid, str(uuid4()),
+                                        annotations)
+    job.wait_until_done()
+    errors = job.errors
+    if not len(errors):
+        print("Successfully uploaded")
+        lb_model = client.create_model(name=f"text_single_classification_model",
                                ontology_id=project.ontology().uid)
+        print(f"Successfully seeded data and created model. Setup a model run here: https://app.labelbox.com/models/{lb_model.uid}")
+    else:
+        print("Upload contained errors: ", errors)
 
-max_labels = 2000
-labels = [label.uid for label in list(project.label_generator())[:max_labels]]
-lb_model_run = lb_model.create_model_run(f"0.0.0")
-lb_model_run.upsert_labels(labels)
-print("Successfully created Model and ModelRun")
+
+if __name__ == '__main__':
+    client = Client()
+    main(client)
