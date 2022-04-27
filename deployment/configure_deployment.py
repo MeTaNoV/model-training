@@ -34,10 +34,7 @@ try:
     print(f"Deployment will use GCS bucket: `{bucket_name}`")
 except NotFound:
     print(f"Creating new bucket with name : `{bucket_name}`")
-    bucket = storage_client.bucket(bucket_name)
-    bucket.storage_class = "STANDARD"
-    bucket.location = 'US-CENTRAL1'
-    new_bucket = storage_client.create_bucket(bucket)
+    storage_client.create_bucket(bucket_name, location = 'US-CENTRAL1')
     print(f"Created GCS bucket: `{bucket_name}`")
 
 client = secretmanager.SecretManagerServiceClient()
