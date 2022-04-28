@@ -28,8 +28,6 @@ TARGET_TAGS=$DEPLOYMENT_NAME-tags
 FIREWALL_NAME=$DEPLOYMENT_NAME-firewall
 STATIC_IP_NAME=$DEPLOYMENT_NAME-static-ip
 
-# TODO: Wait until done..
-
 enable_service() {
   echo "Enabling service: $1"
   gcloud services enable $1
@@ -44,16 +42,11 @@ enable_service() {
   exit 1
 }
 
-# Enable vertex, GCR, cloud storage, secret manager
+# Enable vertex, GCR, cloud storage, secret manager, cloud storage api
 enable_service aiplatform.googleapis.com
 enable_service containerregistry.googleapis.com
 enable_service secretmanager.googleapis.com
-# Not sure which (or both) is necessary..
-#storage-component.googleapis.com                                                                     Cloud Storage
-#storage.googleapis.com                                                                               Cloud Storage API
 enable_service storage.googleapis.com
-
-# Load secrets
 
 # Build Containers
 docker-compose build
