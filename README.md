@@ -14,38 +14,20 @@ Run ETL jobs, train models, deploy models, and track model performance all from 
 
 ### Requirements
 
-1. docker-compose installed
+1. Create a service account in the google cloud UI. This account must have the following permissions:
+    * Basic editor permissions
+    * Secret manager admin
+2. Download the private key for the service account
+    * Put it anywhere on your computer
+    * Set the GOOGLE_APPLICATION_CREDENTIALS to point to it. `export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/model-training-credentials.json`
+3. docker-compose installed
     * https://docs.docker.com/compose/install/
-2. gcloud cli installed (and configured for the proper service account)
+4. gcloud cli installed (and configured for the proper service account)
     * Run `curl https://sdk.cloud.google.com | bash` to install
     * `source ~/.<bash_profile/zshrc/bashrc>` to load env vars
-    * `gcloud auth login` to login
+    * `gcloud auth login` to login (You also can login from the service account directly with `gcloud auth activate-service-account SERVICE_ACCOUNT_ID@PROJECT_ID.iam.gserviceaccount.com --key-file=$GOOGLE_APPLICATION_CREDENTIALS`)
     * Set the correct google project with `gcloud config set project PROJECT_NAME`
-3. Google cloud service account key file (Discuss with your own security team on the practice you would like to follow. Do not copy without understanding what this does.)
-    * If you don't already have a service account key file you can create one with the following:
-    * Your account must have read and edit permissions
-    * Create the service account
-        ```
-        gcloud iam service-accounts create ACCOUNT_NAME \
-            --description="account for configuring model training" \
-            --display-name="model-training" 
-        ```
-    * Assign the service account your account permissions 
-        ``` 
-        gcloud iam service-accounts add-iam-policy-binding \
-            ACCOUNT_NAME@PROJECT_ID.iam.gserviceaccount.com \
-            --member="user:YOUR_ACCOUNT_EMAIL" \
-            --role="roles/iam.serviceAccountUser"
-        ```
-    * Set path for credentials `export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/model-training-credentials.json`
-    * Create the service account credentials 
-        ``` 
-        gcloud iam service-accounts keys create $GOOGLE_APPLICATION_CREDENTIALS \
-            --iam-account=ACCOUNT_NAME@PROJECT_ID.iam.gserviceaccount.com
-        ```
-4. Connect docker to GCR by running `gcloud auth configure-docker`
-
-
+5. Connect docker to GCR by running `gcloud auth configure-docker`
 
 
 ### Deployment
@@ -72,7 +54,7 @@ Deploy the coordinator service on port 8000
     - To the cloud: `./deployment/deploy.sh`
     - Locally: `./run.sh`
 4. Test that it is running with:
-    - curl http://ip:8000/ping 
+    - curl http://ip:8000/ping
     - ip will be `0.0.0.0` for a local deployment and the remote ip will be printed to the console when you run the deployment script.
     - The server will respond with pong if the deployment was successful
 
