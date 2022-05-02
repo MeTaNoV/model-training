@@ -28,18 +28,18 @@ Run ETL jobs, train models, deploy models, and track model performance all from 
         ```
         gcloud iam service-accounts create ACCOUNT_NAME \
             --description="account for configuring model training" \
-            --display-name="model-training" 
+            --display-name="model-training"
         ```
-    * Assign the service account your account permissions 
-        ``` 
+    * Assign the service account your account permissions
+        ```
         gcloud iam service-accounts add-iam-policy-binding \
             ACCOUNT_NAME@PROJECT_ID.iam.gserviceaccount.com \
             --member="user:YOUR_ACCOUNT_EMAIL" \
             --role="roles/iam.serviceAccountUser"
         ```
     * Set path for credentials `export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/model-training-credentials.json`
-    * Create the service account credentials 
-        ``` 
+    * Create the service account credentials
+        ```
         gcloud iam service-accounts keys create $GOOGLE_APPLICATION_CREDENTIALS \
             --iam-account=ACCOUNT_NAME@PROJECT_ID.iam.gserviceaccount.com
         ```
@@ -72,7 +72,7 @@ Deploy the coordinator service on port 8000
     - To the cloud: `./deployment/deploy.sh`
     - Locally: `./run.sh`
 4. Test that it is running with:
-    - curl http://ip:8000/ping 
+    - curl http://ip:8000/ping
     - ip will be `0.0.0.0` for a local deployment and the remote ip will be printed to the console when you run the deployment script.
     - The server will respond with pong if the deployment was successful
 
@@ -138,3 +138,11 @@ Key terms:
 3. Add the job to a pipeline in `coordinator/config.py`
     * Update `pipelines` to include the new workflow
     * Add the new pipeline name `PipelineName` type as a Literal
+
+
+### Testing
+
+* To run any of the seed scripts you can use the `model_training_tests` container
+    * Run: `docker-compose run model_training_tests python3 tests/seed/<script>.py`
+    * Once the data is seeded you can test against a local or live deployment of the coordinator
+* Additional tests are currently being developed
