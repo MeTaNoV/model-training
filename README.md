@@ -20,8 +20,9 @@ Run ETL jobs, train models, deploy models, and track model performance all from 
 2. Download the private key for the service account
     * Put it anywhere on your computer
     * Set the GOOGLE_APPLICATION_CREDENTIALS to point to it. `export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/model-training-credentials.json`
-3. docker-compose installed
+3. docker and docker-compose installed
     * https://docs.docker.com/compose/install/
+    * https://docs.docker.com/get-docker/ (not required for mac since docker and docker-compose are available together in the first link).
 4. gcloud cli installed (and configured for the proper service account)
     * Run `curl https://sdk.cloud.google.com | bash` to install
     * `source ~/.<bash_profile/zshrc/bashrc>` to load env vars
