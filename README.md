@@ -27,7 +27,7 @@ Run ETL jobs, train models, deploy models, and track model performance all from 
     * Run `curl https://sdk.cloud.google.com | bash` to install
     * `source ~/.<bash_profile/zshrc/bashrc>` to load env vars
     * `gcloud auth login` to login (You also can login from the service account directly with `gcloud auth activate-service-account SERVICE_ACCOUNT_ID@PROJECT_ID.iam.gserviceaccount.com --key-file=$GOOGLE_APPLICATION_CREDENTIALS`)
-    * Set the correct google project with `gcloud config set project PROJECT_NAME`
+    * Set the correct google project with `gcloud config set project PROJECT_ID`
 5. Connect docker to GCR by running `gcloud auth configure-docker`
 
 
