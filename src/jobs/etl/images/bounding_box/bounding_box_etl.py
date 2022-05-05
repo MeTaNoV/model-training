@@ -7,8 +7,6 @@ from typing import Tuple
 from io import BytesIO
 import os
 
-import requests
-from PIL.Image import Image, open as load_image
 from google.cloud.storage.bucket import Bucket
 from google.cloud import storage
 from google.cloud import secretmanager
@@ -16,6 +14,8 @@ from google.cloud import secretmanager
 from labelbox.data.annotation_types import Label, Rectangle
 from labelbox.data.serialization import LBV1Converter
 from labelbox import Client
+
+from training_lib.image import download_image, image_to_bytes
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,20 +42,8 @@ VERTEX_MIN_BBOX_DIM = 9
 VERTEX_MAX_EXAMPLES_PER_IMAGE = 500
 VERTEX_MIN_TRAINING_EXAMPLES = 50
 
-
-def download_image(image_url: str,
-                   scale_w: float = 1 / 2.,
-                   scale_h: float = 1 / 2.) -> Tuple[Image, Tuple[int, int]]:
-    im = load_image(BytesIO(requests.get(image_url).content))
-    w, h = im.size
-    return im.resize((int(w * scale_w), int(h * scale_h))), (w, h)
-
-
-def image_to_bytes(im: Image) -> BytesIO:
-    im_bytes = BytesIO()
-    im.save(im_bytes, format="jpeg")
-    im_bytes.seek(0)
-    return im_bytes
+# TODO: add retry logic on i/o!!
+# Filter out unfetchable assets!
 
 
 def upload_to_gcs(image_bytes: BytesIO, data_row_uid: str, h: int, w: int,

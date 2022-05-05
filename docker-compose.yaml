@@ -44,24 +44,24 @@ services:
 
   bounding_box_etl:
     build:
-      context: ./src/jobs/etl/images/bounding_box/
-      dockerfile: Dockerfile
+      context: ./src
+      dockerfile: jobs/etl/images/bounding_box/Dockerfile
       args:
         DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/bounding_box_etl
 
   ner_etl:
     build:
-      context: ./src/jobs/etl/text/ner/
-      dockerfile: Dockerfile
+      context: ./src
+      dockerfile: jobs/etl/text/ner/Dockerfile
       args:
         DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/ner_etl
 
   image_classification_etl:
     build:
-      context: ./src/jobs/etl/images/classification/
-      dockerfile: Dockerfile
+      context: ./src
+      dockerfile: jobs/etl/images/classification/Dockerfile
       args:
         DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/image_classification_etl
@@ -69,8 +69,8 @@ services:
 
   text_classification_etl:
     build:
-      context: ./src/jobs/etl/text/classification/
-      dockerfile: Dockerfile
+      context: ./src
+      dockerfile: jobs/etl/text/classification/Dockerfile
       args:
         DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/text_classification_etl
