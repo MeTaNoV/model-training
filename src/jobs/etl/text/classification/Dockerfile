@@ -12,5 +12,6 @@ ENV DEPLOYMENT_NAME=$DEPLOYMENT_NAME
 COPY ./training_lib training_lib
 RUN pip3 install training_lib/
 
+COPY ./jobs/etl/text/classification/ .
 
 ENTRYPOINT [ "python3", "classification_etl.py"]

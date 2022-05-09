@@ -75,8 +75,10 @@ def create_labels(feature_schema_lookup):
                 'text': text,
                 'annotations': annotations
             }
-    return label_data
 
+        if len(label_data) > 3000:
+            break
+    return label_data
 
 
 
