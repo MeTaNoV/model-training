@@ -171,11 +171,11 @@ class ImageKNNClassificationPipeline(ImageClassificationPipeline):
 
         self.update_status(PipelineState.TRAINING_MODEL,
                            model_run_id,
-                           metadata={'training_data_input': etl_status.result})
+                           metadata={'training_data_input': etl_status.result['etl_file']})
 
         training_status = self.run_job(
             model_run_id,
-            lambda: self.training_job.run(etl_status.result, job_name))
+            lambda: self.training_job.run(etl_status.result['etl_file'], job_name))
 
         self.update_status(
             PipelineState.TRAINING_MODEL,
