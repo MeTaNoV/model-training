@@ -81,7 +81,6 @@ class TextClassificationTraining(Job):
 
 
 class TextClassificationDeployment(Job):
-
     def run(self, model: aiplatform.Model, job_name: str) -> JobStatus:
         endpoint = model.deploy(deployed_model_display_name=job_name)
         return JobStatus(JobState.SUCCESS,
@@ -121,8 +120,7 @@ class TextClassificationPipeline(Pipeline):
         self.update_status(PipelineState.PREPARING_DATA, model_run_id)
         etl_status = self.run_job(
             model_run_id, lambda: self.etl_job.run(model_run_id, job_name))
-        if etl_status is None:
-            return
+
         self.update_status(PipelineState.TRAINING_MODEL,
                            model_run_id,
                            metadata={'training_data_input': etl_status.result})
@@ -130,19 +128,18 @@ class TextClassificationPipeline(Pipeline):
         training_status = self.run_job(
             model_run_id,
             lambda: self.training_job.run(etl_status.result, job_name))
-        if training_status is None:
-            return
+
         self.update_status(
             PipelineState.TRAINING_MODEL,
             model_run_id,
             metadata={'model_id': training_status.result['model'].name})
 
-        inference_status = self.run_job(
+        self.run_job(
             model_run_id, lambda: self.inference.run(
                 etl_status.result, model_run_id, training_status.result[
                     'model'], job_name))
-        if inference_status is not None:
-            self.update_status(PipelineState.COMPLETE, model_run_id)
+
+        self.update_status(PipelineState.COMPLETE, model_run_id)
 
 
 class TextSingleClassificationPipeline(TextClassificationPipeline):

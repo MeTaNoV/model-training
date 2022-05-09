@@ -63,8 +63,7 @@ class Pipeline(Job):
             self.update_status(PipelineState.FAILED,
                                model_run_id,
                                error_message=str(e))
-            logger.info(f"Job failed. {e}")
-            return
+            raise e
 
     def update_status(self,
                       state: PipelineState,
