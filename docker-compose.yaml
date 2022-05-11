@@ -44,36 +44,69 @@ services:
 
   bounding_box_etl:
     build:
-      context: ./src/jobs/etl/images/bounding_box/
-      dockerfile: Dockerfile
+      context: ./src
+      dockerfile: jobs/etl/images/bounding_box/Dockerfile
       args:
         DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/bounding_box_etl
+    volumes:
+      - type: bind
+        source: ${GOOGLE_APPLICATION_CREDENTIALS}
+        target: ${GOOGLE_APPLICATION_CREDENTIALS}
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
+      LABELBOX_API_KEY: ${LABELBOX_API_KEY}
+      GOOGLE_PROJECT: ${GOOGLE_PROJECT}
+
 
   ner_etl:
     build:
-      context: ./src/jobs/etl/text/ner/
-      dockerfile: Dockerfile
+      context: ./src
+      dockerfile: jobs/etl/text/ner/Dockerfile
       args:
         DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/ner_etl
+    volumes:
+      - type: bind
+        source: ${GOOGLE_APPLICATION_CREDENTIALS}
+        target: ${GOOGLE_APPLICATION_CREDENTIALS}
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
+      LABELBOX_API_KEY: ${LABELBOX_API_KEY}
+      GOOGLE_PROJECT: ${GOOGLE_PROJECT}
 
   image_classification_etl:
     build:
-      context: ./src/jobs/etl/images/classification/
-      dockerfile: Dockerfile
+      context: ./src
+      dockerfile: jobs/etl/images/classification/Dockerfile
       args:
         DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/image_classification_etl
+    volumes:
+      - type: bind
+        source: ${GOOGLE_APPLICATION_CREDENTIALS}
+        target: ${GOOGLE_APPLICATION_CREDENTIALS}
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
+      LABELBOX_API_KEY: ${LABELBOX_API_KEY}
+      GOOGLE_PROJECT: ${GOOGLE_PROJECT}
 
 
   text_classification_etl:
     build:
-      context: ./src/jobs/etl/text/classification/
-      dockerfile: Dockerfile
+      context: ./src
+      dockerfile: jobs/etl/text/classification/Dockerfile
       args:
         DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/text_classification_etl
+    volumes:
+      - type: bind
+        source: ${GOOGLE_APPLICATION_CREDENTIALS}
+        target: ${GOOGLE_APPLICATION_CREDENTIALS}
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
+      LABELBOX_API_KEY: ${LABELBOX_API_KEY}
+      GOOGLE_PROJECT: ${GOOGLE_PROJECT}
 
   knn_classification_train:
     build:
@@ -82,6 +115,7 @@ services:
       args:
         DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/knn_classification_train
+
 
   knn_classification_predict:
     build:

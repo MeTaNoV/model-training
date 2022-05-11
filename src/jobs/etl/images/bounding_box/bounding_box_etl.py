@@ -1,86 +1,68 @@
-from concurrent.futures import ThreadPoolExecutor
+
 import json
 import argparse
-import time
 import logging
-from typing import Tuple
-from io import BytesIO
-import os
+from typing import Optional
 
-import requests
-from PIL.Image import Image, open as load_image
-from google.cloud.storage.bucket import Bucket
-from google.cloud import storage
-from google.cloud import secretmanager
+from training_lib.errors import InvalidLabelException
+from training_lib.storage import get_image_bytes, upload_image_to_gcs
+from training_lib.etl import process_labels_in_threadpool, get_labels_for_model_run, partition_mapping, validate_label
+from training_lib.clients import get_lb_client, get_gcs_client
+from training_lib.storage import upload_ndjson_data, create_gcs_key
 
-from labelbox.data.annotation_types import Label, Rectangle
-from labelbox.data.serialization import LBV1Converter
 from labelbox import Client
+from labelbox.data.annotation_types import Label, Rectangle
+from google.cloud.storage.bucket import Bucket
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Maps from our partition naming convention to google's
-partition_mapping = {
-    'training': 'train',
-    'test': 'test',
-    'validation': 'validation'
-}
-
-# Optionally set env var for testing
-_labelbox_api_key = os.environ.get('LABELBOX_API_KEY')
-
-if _labelbox_api_key is None:
-    deployment_name = os.environ['DEPLOYMENT_NAME']
-    secret_client = secretmanager.SecretManagerServiceClient()
-    secret_id = f"{deployment_name}_labelbox_api_key"
-    name = f"projects/{os.environ['GOOGLE_PROJECT']}/secrets/{secret_id}/versions/1"
-    response = secret_client.access_secret_version(request={"name": name})
-    _labelbox_api_key = response.payload.data.decode("UTF-8")
 
 VERTEX_MIN_BBOX_DIM = 9
 VERTEX_MAX_EXAMPLES_PER_IMAGE = 500
 VERTEX_MIN_TRAINING_EXAMPLES = 50
 
 
-def download_image(image_url: str,
-                   scale_w: float = 1 / 2.,
-                   scale_h: float = 1 / 2.) -> Tuple[Image, Tuple[int, int]]:
-    im = load_image(BytesIO(requests.get(image_url).content))
-    w, h = im.size
-    return im.resize((int(w * scale_w), int(h * scale_h))), (w, h)
+def clip_and_round(value: float) -> float:
+    """
+    Constrains the value to be between 0 and 1 (otherwise vertex will filter out these examples).
+    Args:
+        value: number to clip and round
+    Returns:
+        rounded number clipped to be between 0 and 1
+    """
+
+    rounded = round(value, 2)
+    return max(min(rounded, 1), 0)
 
 
-def image_to_bytes(im: Image) -> BytesIO:
-    im_bytes = BytesIO()
-    im.save(im_bytes, format="jpeg")
-    im_bytes.seek(0)
-    return im_bytes
+def convert_to_percent(bbox: Rectangle, image_w, image_h):
+    """
+    Converts a labelbox bounding box annotation into a vertex bounding box annotation.
+    Args:
+          bbox: Bounding box annotation to convert
+          image_w: image width to scale by
+          image_h: image height to scale by
+    """
+    return {
+        "xMin": clip_and_round(bbox.start.x / image_w),
+        "yMin": clip_and_round(bbox.start.y / image_h),
+        "xMax": clip_and_round(bbox.end.x / image_w),
+        "yMax": clip_and_round(bbox.end.y / image_h),
+    }
 
 
-def upload_to_gcs(image_bytes: BytesIO, data_row_uid: str, h: int, w: int,
-                  bucket: Bucket) -> str:
-    # Vertex will not work unless the input data is a gcs_uri
-    gcs_key = f"training/images/{data_row_uid}_{int(w)}_{int(h)}.jpg"
-    blob = bucket.blob(gcs_key)
-    blob.upload_from_file(image_bytes, content_type="image/jpg")
-    return f"gs://{bucket.name}/{blob.name}"
-
-
-def process_label(label: Label, bucket: Bucket) -> str:
-    data_split = label.extra.get("Data Split")
-    if data_split is None:
-        logger.warning("No data split assigned. Skipping.")
-        return
-
+def process_label(label: Label, bucket: Bucket, downsample_factor: int = 4) -> Optional[str]:
+    """
+    Function for converting a labelbox Label object into a vertex json label for object detection.
+    Args:
+        label: the label to convert
+    Returns:
+        Stringified json representing a vertex label
+    """
     bounding_box_annotations = []
-    # TODO: Only download if the label has annotations
-    # When this is only necessary since we don't have media attributes in the export yet.
-    downsample_factor = 4
-    image, (w, h) = download_image(label.data.url, 1. / downsample_factor,
-                                   1. / downsample_factor)
-    image_bytes = image_to_bytes(image)
-    gcs_uri = upload_to_gcs(image_bytes, label.data.uid, h, w, bucket)
+    validate_label(label)
+    image_bytes, (w,h) = get_image_bytes(label.data.url)
 
     for annotation in label.annotations:
         if isinstance(annotation.value, Rectangle):
@@ -89,32 +71,30 @@ def process_label(label: Label, bucket: Bucket) -> str:
                     VERTEX_MIN_BBOX_DIM * downsample_factor) or (
                         bbox.end.y - bbox.start.y) < (VERTEX_MIN_BBOX_DIM *
                                                       downsample_factor):
-                logger.info(
-                    f"continuing. ({bbox.end.x - bbox.start.x}) or ({bbox.end.y - bbox.start.y}) "
+
+                new_x = round((bbox.end.x - bbox.start.x) * 1./downsample_factor)
+                new_y = round((bbox.end.y - bbox.start.y) * 1./downsample_factor)
+                logger.warning(
+                    f"Resized bounding box is too small ({new_x}, {new_y})."
                 )
                 continue
 
-            # If the points are not within the range [0,1] then vertex will filter them out.
-            # This often leads to an error at training time with the following message:
-            # "Image Object Detection training requires training, validation and test datasets to be non-empty..."
             bounding_box_annotations.append({
                 "displayName": annotation.name,
-                "xMin": round(bbox.start.x / w, 2),
-                "yMin": round(bbox.start.y / h, 2),
-                "xMax": round(bbox.end.x / w, 2),
-                "yMax": round(bbox.end.y / h, 2),
+                **convert_to_percent(bbox, w, h)
             })
 
     if len(bounding_box_annotations) == 0:
-        return
+        raise InvalidLabelException(f"There are 0 valid annotations for data row `{label.data.uid}`.")
 
+    gcs_uri = upload_image_to_gcs(image_bytes, label.data.uid, bucket, (w, h))
     return json.dumps({
         'imageGcsUri':
             gcs_uri,
         'boundingBoxAnnotations':
             bounding_box_annotations[:VERTEX_MAX_EXAMPLES_PER_IMAGE],
         'dataItemResourceLabels': {
-            "aiplatform.googleapis.com/ml_use": partition_mapping[data_split],
+            "aiplatform.googleapis.com/ml_use": partition_mapping[label.extra.get("Data Split")],
             "dataRowId": label.data.uid
         }
     })
@@ -127,40 +107,31 @@ def bounding_box_etl(lb_client: Client, model_run_id: str, bucket) -> str:
     This code barely validates the requirements as listed in the vertex documentation.
     Read more about the restrictions here:
         - https://cloud.google.com/vertex-ai/docs/datasets/prepare-image#object-detection
+
+    Args:
+        lb_client: Labelbox client object
+        model_run_id: the id of the model run to export labels from
+        bucket: Cloud storage bucket used to upload image data to
+    Retuns:
+        stringified ndjson
     """
-    model_run = lb_client.get_model_run(model_run_id)
-    json_labels = model_run.export_labels(download=True)
 
-    with ThreadPoolExecutor(max_workers=8) as exc:
-        training_data_futures = [
-            exc.submit(process_label, label, bucket)
-            for label in LBV1Converter.deserialize(json_labels)
-        ]
-    training_data = [future.result() for future in training_data_futures]
-    training_data = [
-        example for example in training_data if example is not None
-    ]
+    labels = get_labels_for_model_run(lb_client, model_run_id)
+    training_data = process_labels_in_threadpool(process_label, labels, bucket)
 
-    # The requirement seems to only apply to training data.
-    # This should be changed to check by split
     if len(training_data) < VERTEX_MIN_TRAINING_EXAMPLES:
-        raise Exception("Not enought training examples provided")
+        raise InvalidLabelException("Not enough training examples provided")
 
-    # jsonl
     return "\n".join(training_data)
 
 
-def main(model_run_id: str, gcs_bucket: str, gcs_key: str):
-    gcs_client = storage.Client(project=os.environ['GOOGLE_PROJECT'])
-    lb_client = Client(api_key=_labelbox_api_key,
-                       endpoint='https://api.labelbox.com/_gql', enable_experimental=True)
-    bucket = gcs_client.bucket(gcs_bucket)
-    nowgmt = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
-    gcs_key = gcs_key or f'etl/bounding-box/{nowgmt}.jsonl'
-    blob = bucket.blob(gcs_key)
+def main(model_run_id: str, gcs_bucket: str, gcs_key: Optional[str] = None):
+    lb_client = get_lb_client()
+    bucket = get_gcs_client().bucket(gcs_bucket)
     json_data = bounding_box_etl(lb_client, model_run_id, bucket)
-    blob.upload_from_string(json_data)
-    logger.info("ETL Complete. URI: %s", f"gs://{bucket.name}/{blob.name}")
+    gcs_key = gcs_key or create_gcs_key('bounding-box')
+    etl_file = upload_ndjson_data(json_data, bucket, gcs_key)
+    logger.info("ETL Complete. URI: %s", f"{etl_file}")
 
 
 if __name__ == '__main__':
