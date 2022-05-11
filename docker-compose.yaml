@@ -90,18 +90,3 @@ services:
       args:
         DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
     image: gcr.io/${GOOGLE_PROJECT}/${DEPLOYMENT_NAME}/knn_classification_predict
-
-  model_training_tests:
-    build:
-      context: ./test/
-      dockerfile: Dockerfile
-    volumes:
-      - type: bind
-        source: ${GOOGLE_APPLICATION_CREDENTIALS}
-        target: ${GOOGLE_APPLICATION_CREDENTIALS}
-      - type: bind
-        source: ./
-        target: /test/
-    environment:
-      LABELBOX_API_KEY: ${LABELBOX_API_KEY}
-      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}

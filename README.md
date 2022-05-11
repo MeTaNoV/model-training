@@ -142,7 +142,6 @@ Key terms:
 
 ### Testing
 
-* To run any of the seed scripts you can use the `model_training_tests` container
-    * Run: `docker-compose run model_training_tests python3 tests/seed/<script>.py`
+* To run any of the seed scripts you can use the `seed.sh` script. It will run any of the python script in a docker container
+    * Run: `./seed.sh <script>.py`
     * Once the data is seeded you can test against a local or live deployment of the coordinator
-* Additional tests are currently being developed
