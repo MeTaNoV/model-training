@@ -121,3 +121,10 @@ Key terms:
 3. Add the job to a pipeline in `coordinator/config.py`
     * Update `pipelines` to include the new workflow
     * Add the new pipeline name `PipelineName` type as a Literal
+
+
+### Testing
+
+* To run any of the seed scripts you can use the `seed.sh` script. It will run any of the python script in a docker container
+    * Run: `./seed.sh <script>.py`
+    * Once the data is seeded you can test against a local or live deployment of the coordinator
