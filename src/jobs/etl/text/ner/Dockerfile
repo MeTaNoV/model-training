@@ -13,4 +13,5 @@ COPY ./training_lib training_lib
 RUN pip3 install training_lib/
 
 COPY ./jobs/etl/text/ner/ .
+
 ENTRYPOINT [ "python3", "ner_etl.py"]

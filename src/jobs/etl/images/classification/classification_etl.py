@@ -1,62 +1,39 @@
 import json
 import argparse
-import time
 import logging
 from typing import Literal, Union
-from io import BytesIO
-from concurrent.futures import ThreadPoolExecutor
-import os
 
-import requests
+from training_lib.errors import InvalidLabelException
+from training_lib.storage import upload_image_to_gcs, upload_ndjson_data,  \
+    create_gcs_key, get_image_bytes
+from training_lib.etl import process_labels_in_threadpool, get_labels_for_model_run, partition_mapping, validate_label
+from training_lib.clients import get_lb_client, get_gcs_client
+
 from google.cloud import storage
-from google.cloud import secretmanager
-
 from labelbox.data.annotation_types import Label, Checklist, Radio
-from labelbox.data.serialization import LBV1Converter
 from labelbox import Client
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 VERTEX_MIN_TRAINING_EXAMPLES = 50
 
-# Maps from our partition naming convention to google's
-partition_mapping = {
-    'training': 'train',
-    'test': 'test',
-    'validation': 'validation'
-}
-
-# Optionally set env var for testing
-_labelbox_api_key = os.environ.get('LABELBOX_API_KEY')
-if _labelbox_api_key is None:
-    deployment_name = os.environ['DEPLOYMENT_NAME']
-    secret_client = secretmanager.SecretManagerServiceClient()
-    secret_id = f"{deployment_name}_labelbox_api_key"
-    name = f"projects/{os.environ['GOOGLE_PROJECT']}/secrets/{secret_id}/versions/1"
-    response = secret_client.access_secret_version(request={"name": name})
-    _labelbox_api_key = response.payload.data.decode("UTF-8")
-
-
-def upload_to_gcs(image_url: str, data_row_uid: str,
-                  bucket: storage.Bucket) -> str:
-    # Vertex will not work unless the input data is a gcs_uri
-    image_bytes = BytesIO(requests.get(image_url).content)
-    gcs_key = f"training/images/{data_row_uid}.jpg"
-    blob = bucket.blob(gcs_key)
-    blob.upload_from_file(image_bytes, content_type="image/jpg")
-    return f"gs://{bucket.name}/{blob.name}"
-
 
 def process_single_classification_label(label: Label,
-                                        bucket: storage.Bucket) -> str:
-    data_split = label.extra.get("Data Split")
-    if data_split is None:
-        logger.warning("No data split assigned. Skipping.")
-        return
-
+                                        bucket: storage.Bucket, downsample_factor = 2.) -> str:
+    """
+    Function for converting a labelbox Label object into a vertex json label for text single classification.
+    Args:
+        label: the label to convert
+        bucket: cloud storage bucket to write image data to
+        downsample_factor: how much to scale the images by before running inference
+    Returns:
+        Stringified json representing a vertex label
+    """
     classifications = []
-    gcs_uri = upload_to_gcs(label.data.url, label.data.uid, bucket)
+    validate_label(label)
+    image_bytes, _ = get_image_bytes(label.data.url, downsample_factor)
 
     for annotation in label.annotations:
         if isinstance(annotation.value, Radio):
@@ -65,32 +42,38 @@ def process_single_classification_label(label: Label,
                     f"{annotation.name}_{annotation.value.answer.name}"
             })
     if len(classifications) > 1:
-        logger.info(
+        raise InvalidLabelException(
             "Skipping example. Must provide <= 1 classification per image.")
-        return
     elif len(classifications) == 0:
         classification = {'displayName': 'no_label'}
     else:
         classification = classifications[0]
+
+    gcs_uri = upload_image_to_gcs(image_bytes, label.data.uid, bucket)
     return json.dumps({
         'imageGcsUri': gcs_uri,
         'classificationAnnotation': classification,
         'dataItemResourceLabels': {
-            "aiplatform.googleapis.com/ml_use": partition_mapping[data_split],
+            "aiplatform.googleapis.com/ml_use": partition_mapping[label.extra.get("Data Split")],
             "dataRowId": label.data.uid
         }
     })
 
 
 def process_multi_classification_label(label: Label,
-                                       bucket: storage.Bucket) -> str:
-    data_split = label.extra.get("Data Split")
-    if data_split is None:
-        logger.warning("No data split assigned. Skipping.")
-        return
-
+                                       bucket: storage.Bucket, downsample_factor = 2.) -> str:
+    """
+        Function for converting a labelbox Label object into a vertex json label for text multi classification.
+        Args:
+            label: the label to convert
+            bucket: cloud storage bucket to write image data to
+            downsample_factor: how much to scale the images by before running inference
+        Returns:
+            Stringified json representing a vertex label
+    """
     classifications = []
-    gcs_uri = upload_to_gcs(label.data.url, label.data.uid, bucket)
+    validate_label(label)
+    image_bytes, _ = get_image_bytes(label.data.url, downsample_factor)
 
     for annotation in label.annotations:
         if isinstance(annotation.value, Radio):
@@ -105,15 +88,16 @@ def process_multi_classification_label(label: Label,
     if len(classifications) == 0:
         classifications = [{'displayName': 'no_label'}]
 
+    gcs_uri = upload_image_to_gcs(image_bytes, label.data.uid, bucket)
+
     return json.dumps({
         'imageGcsUri': gcs_uri,
         'classificationAnnotations': classifications,
         'dataItemResourceLabels': {
-            "aiplatform.googleapis.com/ml_use": partition_mapping[data_split],
+            "aiplatform.googleapis.com/ml_use": partition_mapping[label.extra.get("Data Split")],
             "dataRowId": label.data.uid
         }
     })
-
 
 def image_classification_etl(lb_client: Client, model_run_id: str,
                              bucket: storage.Bucket, multi: bool) -> str:
@@ -123,49 +107,37 @@ def image_classification_etl(lb_client: Client, model_run_id: str,
     Read more about the configuration here::
         - Multi: https://cloud.google.com/vertex-ai/docs/datasets/prepare-image#multi-label-classification
         - Single: https://cloud.google.com/vertex-ai/docs/datasets/prepare-image#single-label-classification
+
+    Args:
+        lb_client: Labelbox client object
+        model_run_id: the id of the model run to export labels from
+        bucket: Cloud storage bucket used to upload image data to
+        multi: boolean indicating whether or not the etl is for single or multi classification
+    Retuns:
+        stringified ndjson
     """
-    model_run = lb_client.get_model_run(model_run_id)
-    json_labels = model_run.export_labels(download=True)
 
-    for row in json_labels:
-        row['media_type'] = 'image'
+    labels = get_labels_for_model_run(lb_client, model_run_id, media_type='image')
+    if multi:
+        training_data = process_labels_in_threadpool(process_multi_classification_label, labels, bucket)
+    else:
+        training_data = process_labels_in_threadpool(process_single_classification_label, labels, bucket)
 
-    label_data = LBV1Converter.deserialize(json_labels)
-
-    fn = process_multi_classification_label if multi else process_single_classification_label
-    with ThreadPoolExecutor(max_workers=8) as exc:
-        training_data_futures = [
-            exc.submit(fn, label, bucket)
-            for label in label_data
-        ]
-        training_data = [future.result() for future in training_data_futures]
-        training_data = [
-            example for example in training_data if example is not None
-        ]
-
-    # The requirement seems to only apply to training data.
-    # This should be changed to check by split
     if len(training_data) < VERTEX_MIN_TRAINING_EXAMPLES:
-        raise Exception("Not enought training examples provided")
+        raise InvalidLabelException("Not enough training examples provided")
 
-    # jsonl
     return "\n".join(training_data)
 
 
 def main(model_run_id: str, gcs_bucket: str, gcs_key: str,
          classification_type: Union[Literal['single'], Literal['multi']]):
-    gcs_client = storage.Client(project=os.environ['GOOGLE_PROJECT'])
-    lb_client = Client(api_key=_labelbox_api_key,
-                       endpoint='https://api.labelbox.com/_gql', enable_experimental=True)
-    bucket = gcs_client.bucket(gcs_bucket)
-    nowgmt = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
-    gcs_key = gcs_key or f'etl/{classification_type}-classification/{nowgmt}.jsonl'
-    blob = bucket.blob(gcs_key)
+    lb_client = get_lb_client()
+    bucket = get_gcs_client().bucket(gcs_bucket)
     json_data = image_classification_etl(lb_client, model_run_id, bucket,
                                          classification_type == 'multi')
-    blob.upload_from_string(json_data)
-    logger.info("ETL Complete. URI: %s", f"gs://{bucket.name}/{blob.name}")
-
+    gcs_key = gcs_key or create_gcs_key(f'{classification_type}-classification')
+    etl_file = upload_ndjson_data(json_data, bucket, gcs_key)
+    logger.info("ETL Complete. URI: %s", f"{etl_file}")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Vertex AI ETL Runner')
@@ -177,5 +149,3 @@ if __name__ == '__main__':
     parser.add_argument('--gcs_key', type=str, required=False, default=None)
     args = parser.parse_args()
     main(**vars(args))
-
-# TODO: Make sure dataset is being created properly...
