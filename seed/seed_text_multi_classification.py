@@ -106,7 +106,7 @@ def get_fine_class_counts(ds):
     return counts_fine
 
 
-def process_source_data(feature_schema_lookup, min_examples_per_class = 50):
+def process_source_data(feature_schema_lookup, min_examples_per_class = 150):
     ds = tfds.load('trec', split='train')
     seed_labels = defaultdict(list)
     data_row_data = []
