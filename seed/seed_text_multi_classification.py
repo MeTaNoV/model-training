@@ -98,7 +98,7 @@ def setup_project(client):
 def get_fine_class_counts(ds):
     counts_fine = defaultdict(lambda: 0)
     for idx, example in tqdm(enumerate(ds.as_numpy_iterator())):
-        if idx == 2500:
+        if idx == 3000:
             break
         fine_class_name, course_class_name = example['label-fine'], example[
             'label-coarse']
@@ -113,7 +113,7 @@ def process_source_data(feature_schema_lookup, min_examples_per_class = 150):
     counts_fine = get_fine_class_counts(ds)
 
     for idx, example in tqdm(enumerate(ds.as_numpy_iterator())):
-        if idx == 2500:
+        if idx == 3000:
             break
         fine_class_name, course_class_name = example['label-fine'], example[
             'label-coarse']
