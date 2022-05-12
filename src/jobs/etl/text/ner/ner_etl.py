@@ -1,6 +1,7 @@
 import json
 import argparse
 import logging
+from typing import Dict, Any
 
 from labelbox import Client
 from labelbox.data.annotation_types import TextEntity
@@ -8,7 +9,8 @@ from labelbox.data.annotation_types import Label
 
 from training_lib.clients import get_lb_client, get_gcs_client
 from training_lib.errors import InvalidLabelException
-from training_lib.etl import get_labels_for_model_run, process_labels_in_threadpool, partition_mapping, validate_label
+from training_lib.etl import get_labels_for_model_run, process_labels_in_threadpool, partition_mapping, validate_label, \
+    validate_vertex_dataset
 from training_lib.storage import upload_ndjson_data, create_gcs_key
 
 logging.basicConfig(level=logging.INFO)
@@ -19,13 +21,13 @@ MIN_ANNOTATIONS, MAX_ANNOTATIONS = 1, 20
 MIN_ANNOTATION_NAME_LENGTH, MAX_ANNOTATION_NAME_LENGTH = 2, 30
 
 
-def process_label(label: Label) -> str:
+def process_label(label: Label) -> Dict[str, Any]:
     """
     Function for converting a labelbox Label object into a vertex json label for ner.
     Args:
         label: the label to convert
     Returns:
-        Stringified json representing a vertex label
+        Dict representing a vertex label
     """
     text_annotations = []
     validate_label(label)
@@ -37,7 +39,7 @@ def process_label(label: Label) -> str:
                     annotation.name) > MAX_ANNOTATION_NAME_LENGTH:
                 logger.warning(
                     "Skipping annotation `{annotation.name}`. "
-                    "Lenght of name invalid. Must be: "
+                    "Length of name invalid. Must be: "
                     f"{MIN_ANNOTATION_NAME_LENGTH}<=num chars<={MAX_ANNOTATION_NAME_LENGTH}"
                 )
                 continue
@@ -52,7 +54,7 @@ def process_label(label: Label) -> str:
         raise InvalidLabelException("Skipping label. Number of annotations is not in range: "
                     f"{MIN_ANNOTATIONS}<=num annotations<={MAX_ANNOTATIONS}")
 
-    return json.dumps({
+    return {
         "textSegmentAnnotations": text_annotations,
         # Note that this always uploads the text data in-line
         "textContent": label.data.value,
@@ -60,7 +62,7 @@ def process_label(label: Label) -> str:
             "aiplatform.googleapis.com/ml_use": partition_mapping[label.extra.get("Data Split")],
             "dataRowId": label.data.uid
         }
-    })
+    }
 
 
 def ner_etl(lb_client: Client, model_run_id: str) -> str:
@@ -78,12 +80,9 @@ def ner_etl(lb_client: Client, model_run_id: str) -> str:
         stringified ndjson
     """
     labels = get_labels_for_model_run(lb_client, model_run_id, media_type='text')
-    training_data = process_labels_in_threadpool(process_label, labels)
-
-    if len(training_data) < VERTEX_MIN_TRAINING_EXAMPLES:
-        raise InvalidLabelException("Not enough training examples provided")
-    training_data = training_data[:VERTEX_MAX_TRAINING_EXAMPLES]
-    return "\n".join(training_data)
+    vertex_labels = process_labels_in_threadpool(process_label, labels)
+    validate_vertex_dataset(vertex_labels, 'textSegmentAnnotations', min_classes = 1, max_classes = 100, min_labels = 50)
+    return "\n".join([json.dumps(label) for label in vertex_labels])
 
 
 def main(model_run_id: str, gcs_bucket: str, gcs_key: str):

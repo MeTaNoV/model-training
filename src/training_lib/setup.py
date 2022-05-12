@@ -9,7 +9,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         "PILLOW", "google-cloud-secret-manager", "google-cloud-storage",
-        "labelbox[data]", "requests", "google-api-core"],
+        "labelbox[data]", "requests", "google-api-core", "base36"],
 )
 
 

@@ -14,3 +14,8 @@ class InvalidLabelException(Exception):
     """ Exception for when the data is invalid for vertex."""
     pass
 
+
+class InvalidDatasetException(Exception):
+    """ Exception if the complete dataset doesn't meet vertex requirements"""
+    pass
+
