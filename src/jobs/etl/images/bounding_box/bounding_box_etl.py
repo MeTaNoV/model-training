@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 VERTEX_MIN_BBOX_DIM = 9
 VERTEX_MAX_EXAMPLES_PER_IMAGE = 500
-MIN_LABELS_PER_CLASS = 10
 
 
 def clip_and_round(value: float) -> float:

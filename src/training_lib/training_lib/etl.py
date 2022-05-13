@@ -10,7 +10,6 @@ from labelbox.data.serialization import LBV1Converter
 from labelbox.data.annotation_types import Label, LabelGenerator
 import labelbox
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -128,11 +127,3 @@ def validate_vertex_dataset(vertex_labels, annotation_name, min_labels_per_class
 
     if min_labels is not None and  len(vertex_labels) < min_labels:
         raise InvalidLabelException(f"Must provide at least {min_labels} complete labels. Found {len(vertex_labels)}")
-
-"""
-* TODO: Filter out the under-representative classes (make sure all seed data etls work!)
-* Test everything once more
-* Make the PR
-Look at the git diff so you aren't an idiot again..
-
-"""

@@ -20,9 +20,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-MIN_LABELS_PER_CLASS = 10
-
-
 def process_single_classification_label(label: Label,
                                         bucket: storage.Bucket, downsample_factor = 2.) -> Dict[str, Any]:
     """
