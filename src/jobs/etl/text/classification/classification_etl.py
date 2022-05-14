@@ -1,11 +1,12 @@
 import json
 import argparse
 import logging
-from typing import Literal, Union
+from typing import Literal, Union, Dict, Any
 from collections import Counter
 
 from training_lib.errors import InvalidLabelException
-from training_lib.etl import process_labels_in_threadpool, get_labels_for_model_run, partition_mapping, validate_label
+from training_lib.etl import process_labels_in_threadpool, get_labels_for_model_run, PARTITION_MAPPING, validate_label, \
+    validate_vertex_dataset
 from training_lib.clients import get_lb_client, get_gcs_client
 from training_lib.storage import upload_ndjson_data, create_gcs_key
 from training_lib.storage import upload_text_to_gcs
@@ -23,14 +24,14 @@ VERTEX_MIN_TRAINING_EXAMPLES = 50
 
 
 def process_single_classification_label(label: Label,
-                                        bucket: storage.Bucket) -> str:
+                                        bucket: storage.Bucket) -> Dict[str, Any]:
     """
     Function for converting a labelbox Label object into a vertex json label for text single classification.
     Args:
         label: the label to convert
         bucket: cloud storage bucket to write text data to
     Returns:
-        Stringified json representing a vertex label
+        Dict representing a vertex label
     """
     classifications = []
     validate_label(label)
@@ -52,25 +53,25 @@ def process_single_classification_label(label: Label,
         classification = classifications[0]
 
     uri = upload_text_to_gcs(label.data.value, label.data.uid, bucket)
-    return json.dumps({
+    return {
         'textGcsUri': uri,
         'classificationAnnotation': classification,
         'dataItemResourceLabels': {
-            "aiplatform.googleapis.com/ml_use": partition_mapping[label.extra.get("Data Split")],
+            "aiplatform.googleapis.com/ml_use": PARTITION_MAPPING[label.extra.get("Data Split")],
             "dataRowId": label.data.uid
         }
-    })
+    }
 
 
 def process_multi_classification_label(label: Label,
-                                       bucket: storage.Bucket) -> str:
+                                       bucket: storage.Bucket) -> Dict[str, Any]:
     """
     Function for converting a labelbox Label object into a vertex json label for text multi classification.
     Args:
         label: the label to convert
         bucket: cloud storage bucket to write text data to
     Returns:
-        Stringified json representing a vertex label
+        Dict representing a vertex label
     """
     classifications = []
     validate_label(label)
@@ -91,14 +92,14 @@ def process_multi_classification_label(label: Label,
         classifications = [{'displayName': 'no_label'}]
 
     uri = upload_text_to_gcs(label.data.value, label.data.uid, bucket)
-    return json.dumps({
+    return {
         'textGcsUri': uri,
         'classificationAnnotations': classifications,
         'dataItemResourceLabels': {
-            "aiplatform.googleapis.com/ml_use": partition_mapping[label.extra.get("Data Split")],
+            "aiplatform.googleapis.com/ml_use": PARTITION_MAPPING[label.extra.get("Data Split")],
             "dataRowId": label.data.uid
         }
-    })
+    }
 
 
 def text_classification_etl(lb_client: Client, model_run_id: str,
@@ -121,37 +122,12 @@ def text_classification_etl(lb_client: Client, model_run_id: str,
 
     labels = get_labels_for_model_run(lb_client, model_run_id, media_type='text')
     if multi:
-        training_data = process_labels_in_threadpool(process_multi_classification_label, labels, bucket)
+        vertex_labels = process_labels_in_threadpool(process_multi_classification_label, labels, bucket)
+        validate_vertex_dataset(vertex_labels, 'classificationAnnotations', min_classes=2, max_classes=5000)
     else:
-        training_data = process_labels_in_threadpool(process_single_classification_label, labels, bucket)
-
-    if len(training_data) < VERTEX_MIN_TRAINING_EXAMPLES:
-        raise InvalidLabelException("Not enough training examples provided.")
-
-    if multi:
-        training_data = list(filter_classes_by_example_count(training_data))
-    return "\n".join(training_data)
-
-
-def filter_classes_by_example_count(training_data, min_examples=30):
-    names = []
-    for row in training_data:
-        for name in [
-                x['displayName']
-                for x in json.loads(row)['classificationAnnotations']
-        ]:
-            names.append(name)
-
-    not_useable = {k for k, v in Counter(names).items() if v < min_examples}
-    for row in training_data:
-        names = [
-            x['displayName']
-            for x in json.loads(row)['classificationAnnotations']
-        ]
-        if not_useable.intersection(set(names)):
-            continue
-        else:
-            yield row
+        vertex_labels = process_labels_in_threadpool(process_single_classification_label, labels, bucket)
+        validate_vertex_dataset(vertex_labels, 'classificationAnnotation', min_classes=2, max_classes=5000)
+    return "\n".join([json.dumps(label) for label in vertex_labels])
 
 
 def main(model_run_id: str, gcs_bucket: str, gcs_key: str,
@@ -160,7 +136,7 @@ def main(model_run_id: str, gcs_bucket: str, gcs_key: str,
     bucket = get_gcs_client().bucket(gcs_bucket)
     json_data = text_classification_etl(lb_client, model_run_id, bucket,
                                         classification_type == 'multi')
-    gcs_key = gcs_key or create_gcs_key(f'{classification_type}-classification')
+    gcs_key = gcs_key or create_gcs_key(f'text-{classification_type}-classification')
     etl_file = upload_ndjson_data(json_data, bucket, gcs_key)
     logger.info("ETL Complete. URI: %s", f"{etl_file}")
 
