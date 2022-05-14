@@ -166,24 +166,19 @@ class ImageKNNClassificationPipeline(ImageClassificationPipeline):
     def run(self, json_data):
         model_run_id, job_name = self.parse_args(json_data)
         self.update_status(PipelineState.PREPARING_DATA, model_run_id)
-        etl_status = self.run_job(
-            model_run_id, lambda: self.etl_job.run(model_run_id, job_name))
+        etl_status = self.etl_job.run(model_run_id, job_name)
 
         self.update_status(PipelineState.TRAINING_MODEL,
                            model_run_id,
                            metadata={'training_data_input': etl_status.result['etl_file']})
 
-        training_status = self.run_job(
-            model_run_id,
-            lambda: self.training_job.run(etl_status.result['etl_file'], job_name))
-
+        training_status = self.training_job.run(etl_status.result['etl_file'], job_name)
         self.update_status(
             PipelineState.TRAINING_MODEL,
             model_run_id,
             metadata={'model_id': training_status.result['model_file']})
 
-        self.run_job(
-            model_run_id, lambda: self.inference.run(
+        self.inference.run(
                 etl_status.result['etl_file'], model_run_id, training_status.result[
-                    'model_file'], job_name))
+                    'model_file'], job_name)
         self.update_status(PipelineState.COMPLETE, model_run_id)

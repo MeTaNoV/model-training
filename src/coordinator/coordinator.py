@@ -5,12 +5,13 @@ import json
 import logging
 import datetime
 
+from labelbox import Client
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Header, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.logger import logger
 import uvicorn
 
-from config import pipelines, PipelineName, SERVICE_SECRET
+from config import pipelines, SERVICE_SECRET, LABELBOX_API_KEY
 from pipelines.types import PipelineState
 
 logger = logging.getLogger("uvicorn")
@@ -20,13 +21,12 @@ app = FastAPI()
 
 async def run(json_data: Dict[str, Any]):
     try:
-        pipeline = json_data['pipeline']
+        pipeline = json_data['model_type']
         await run_in_threadpool(pipelines[pipeline].run, json_data)
     except Exception as e:
         pipelines[pipeline].update_status(PipelineState.FAILED,
                                           json_data['model_run_id'],
                                           error_message=str(e))
-
 
 @app.get("/models")
 async def models(X_Hub_Signature: str = Header(None)):
@@ -72,17 +72,21 @@ def validate_payload(data: Dict[str, str]):
         raise ValueError(
             f"Unkonwn pipeline `{data['modelType']}`. Expected one of {valid_pipelines}"
         )
-    data['pipeline'] = data['modelType']
 
     if 'modelRunId' not in data:
         raise KeyError("Must provide `modelRunId`")
 
+    data['model_type'] = data['modelType']
     data['model_run_id'] = data['modelRunId']
 
     if 'job_name' not in data:
         data[
-            'job_name'] = f'{data["pipeline"]}_{str(datetime.datetime.now()).replace(" ", "_")}'
-    pipelines[data['pipeline']].parse_args(data)
+            'job_name'] = f'{data["model_type"]}_{str(datetime.datetime.now()).replace(" ", "_")}'
+
+    # Check if model_run_id is valid for the org
+    Client(api_key=LABELBOX_API_KEY).get_model_run(data['model_run_id'])
+    pipelines[data['model_type']].parse_args(data)
+
 
 
 @app.get("/ping")
@@ -91,4 +95,4 @@ def health_check():
 
 
 if __name__ == '__main__':
-    uvicorn.run(app, host='0.0.0.0', port=8000)
+    uvicorn.run(app, host='0.0.0.0', port=80)

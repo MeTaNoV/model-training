@@ -57,10 +57,10 @@ docker-compose run deployment_config
 
 # Create Ingress
 gcloud compute firewall-rules create $FIREWALL_NAME \
-    --allow tcp:8000 \
+    --allow tcp:80 \
     --source-ranges 0.0.0.0/0 \
     --target-tags $TARGET_TAGS \
-    --description "Allow port 8000 access to http-server"
+    --description "Allow port 80 access to http-server"
 
 # Create Static IP Address
 gcloud compute addresses create $STATIC_IP_NAME \
@@ -80,7 +80,7 @@ gcloud compute instances \
 
 echo "View deployment here: https://console.cloud.google.com/compute/instances?project=${GOOGLE_PROJECT}"
 
-ENDPOINT=http://$IP_ADDRESS:8000
+ENDPOINT=http://$IP_ADDRESS
 
 echo "Waiting for endpoint to become available."
 for i in {1..20}

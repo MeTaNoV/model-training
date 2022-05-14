@@ -1,9 +1,8 @@
 import os
-from typing import TypedDict, Union, Literal
+from typing import TypedDict
 
 from google.cloud import aiplatform
-from google.cloud import secretmanager
-import google.auth
+from training_lib.clients import load_labelbox_api_key, load_service_secret
 
 from pipelines.images.classification import ImageSingleClassificationPipeline, ImageMultiClassificationPipeline
 from pipelines.images.bounding_box import BoundingBoxPipeline
@@ -13,27 +12,14 @@ from pipelines.text.classification import TextSingleClassificationPipeline, Text
 from pipelines.images.custom_classification import ImageKNNClassificationPipeline
 
 
+LABELBOX_API_KEY = load_labelbox_api_key()
+SERVICE_SECRET = load_service_secret()
+
 service_account = os.environ["GOOGLE_SERVICE_ACCOUNT"]
 google_cloud_project = os.environ['GOOGLE_PROJECT']
 _deployment_name = os.environ['DEPLOYMENT_NAME']
-
-client = secretmanager.SecretManagerServiceClient()
-
-_labelbox_api_key = os.environ.get('LABELBOX_API_KEY')
-if _labelbox_api_key is None:
-    secret_id = f"{_deployment_name}_labelbox_api_key"
-    name = f"projects/{google_cloud_project}/secrets/{secret_id}/versions/1"
-    response = client.access_secret_version(request={"name": name})
-    _labelbox_api_key = response.payload.data.decode("UTF-8")
-
-SERVICE_SECRET = os.environ.get('SERVICE_SECRET')
-if SERVICE_SECRET is None:
-    secret_id = f"{_deployment_name}_service_secret"
-    name = f"projects/{google_cloud_project}/secrets/{secret_id}/versions/1"
-    response = client.access_secret_version(request={"name": name})
-    SERVICE_SECRET = response.payload.data.decode("UTF-8")
-
 # This should always be set (set in the build arg)
+
 _gcs_bucket = os.environ['GCS_BUCKET']
 
 # Uses default project for your credentials. Can overwrite here if necessary.
@@ -51,7 +37,7 @@ class Pipelines(TypedDict):
     image_knn_classification: Pipeline
 
 _common_params = [
-    _deployment_name, _labelbox_api_key, _gcs_bucket, service_account,
+    _deployment_name, LABELBOX_API_KEY, _gcs_bucket, service_account,
     google_cloud_project
 ]
 pipelines: Pipelines = {
@@ -70,14 +56,3 @@ pipelines: Pipelines = {
     'image_knn_classification':
         ImageKNNClassificationPipeline(*_common_params),
 }
-
-PipelineName = Union[Literal['bounding_box', 'ner',
-                             'image_single_classification',
-                             'image_multi_classification',
-                             'text_single_classification',
-                             'text_multi_classification',
-                             'image_knn_classification']]
-
-if set(PipelineName.__args__) != set(pipelines.keys()):
-    raise ValueError(
-        "The keys in `pipelines` must match all names in PipelineName")

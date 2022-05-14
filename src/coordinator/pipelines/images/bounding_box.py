@@ -38,9 +38,11 @@ class BoundingBoxETL(Job):
             container_uri=self.container_name,
         )
         job.run(
-            args=CMDARGS,
-            service_account=self.service_account_email,
-            environment_variables={'GOOGLE_PROJECT': self.google_cloud_project})
+                args=CMDARGS,
+                service_account=self.service_account_email,
+                environment_variables={'GOOGLE_PROJECT': self.google_cloud_project})
+
+
         return JobStatus(JobState.SUCCESS,
                          result={'etl_file' : f'gs://{self.gcs_bucket}/{gcs_key}'})
 
@@ -88,7 +90,7 @@ class BoundingBoxInference(InferenceJob):
         self.confidence_threshold = 0.5
         super().__init__(labelbox_api_key)
 
-    def build_inference_file(self, bucket_name, key):
+    def build_inference_file(self, bucket_name : str, key: str) -> str:
         bucket = self.storage_client.get_bucket(bucket_name)
         # Create a blob object from the filepath
         blob = bucket.blob(key)
@@ -192,24 +194,18 @@ class BoundingBoxPipeline(Pipeline):
         model_run_id, job_name = self.parse_args(json_data)
 
         self.update_status(PipelineState.PREPARING_DATA, model_run_id)
-        etl_status = self.run_job(
-            model_run_id, lambda: self.etl_job.run(model_run_id, job_name))
 
+        etl_status = self.etl_job.run(model_run_id, job_name)
         self.update_status(PipelineState.TRAINING_MODEL,
                            model_run_id,
                            metadata={'training_data_input': etl_status.result['etl_file']})
 
-        training_status = self.run_job(
-            model_run_id,
-            lambda: self.training_job.run(etl_status.result['etl_file'], job_name))
-
+        training_status = self.training_job.run(etl_status.result['etl_file'], job_name)
         self.update_status(
             PipelineState.TRAINING_MODEL,
             model_run_id,
             metadata={'model_id': training_status.result['model'].name})
 
-        self.run_job(
-            model_run_id, lambda: self.inference.run(
-                etl_status.result['etl_file'], model_run_id, training_status.result[
-                    'model'], job_name))
+        self.inference.run(etl_status.result['etl_file'], model_run_id, training_status.result['model'], job_name)
         self.update_status(PipelineState.COMPLETE, model_run_id)
+

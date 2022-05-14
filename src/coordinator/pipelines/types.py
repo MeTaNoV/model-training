@@ -7,11 +7,11 @@ import os
 import time
 import uuid
 import logging
+import re
 
 from google.cloud import storage
 from google.cloud import aiplatform
-from labelbox.data.serialization import LBV1Converter, NDJsonConverter
-from labelbox import ModelRun, Client
+from labelbox import Client
 from labelbox.data.annotation_types import Radio, Checklist
 from labelbox.data.serialization import LBV1Converter, NDJsonConverter
 from labelbox.data.metrics.group import get_label_pairs
@@ -20,6 +20,7 @@ from labelbox import ModelRun
 import requests
 import ndjson
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("uvicorn")
 
 ClassificationType = Union[Literal['single'], Literal['multi']]
@@ -47,7 +48,7 @@ class JobStatus:
 
 class Job(ABC):
 
-    def run(self):
+    def run(self, *args, **kwargs):
         ...
 
 
@@ -56,22 +57,32 @@ class Pipeline(Job):
     def __init__(self, lb_api_key):
         self.lb_client = Client(lb_api_key, enable_experimental=True)
 
-    def run_job(self, model_run_id, fn):
-        try:
-            return fn()
-        except Exception as e:
-            self.update_status(PipelineState.FAILED,
-                               model_run_id,
-                               error_message=str(e))
-            raise e
-
     def update_status(self,
                       state: PipelineState,
                       model_run_id,
                       metadata=None,
                       error_message=None):
         model_run = self.lb_client.get_model_run(model_run_id)
-        model_run.update_status(state.value, metadata, error_message)
+        sanitized_error_message = self._sanitize_error_message(error_message)
+        model_run.update_status(state.value, metadata, sanitized_error_message)
+
+    def _sanitize_error_message(self, error_message: Optional[str]) -> Optional[str]:
+        if error_message is None:
+            return
+
+        # Error message cannot exceed 255 characters
+        error_urls = re.findall(r'https://console.cloud.google.com/logs\S+', error_message)
+        if len(error_urls):
+            error_url = error_urls[0]
+            error_url = error_url.replace("\"", "")
+            if len(error_url) < 208: # 255 - len(message) == 208
+                error_message = f"More information can be found here: {error_url}"
+            elif len(error_url) < 255: # Max length
+                error_message = error_url
+            else:
+                error_message = "Job failed look at google cloud logs for more information. Error message is too long."
+        return error_message[:255]
+
 
     @abstractmethod
     def parse_args(self, json_data: Dict[str, Any]):
@@ -86,13 +97,16 @@ class InferenceJob(Job):
         self.storage_client = storage.Client(
             project=os.environ['GOOGLE_PROJECT'])
 
+    @abstractmethod
+    def build_inference_file(self, bucket_name: str, key: str) -> str:
+        ...
+
     def parse_uri(self, etl_file):
         parts = etl_file.replace("gs://", "").split("/")
         bucket_name, key = parts[0], "/".join(parts[1:])
         return bucket_name, key
 
     def get_tool_info(self, model_id):
-        # Todo: disambiguate the name. Between the client and the ..
         ontologyId = self.lb_client.execute(
             """query modelOntologyPyApi($modelId: ID!){
                 model(where: {id: $modelId}) {ontologyId}}
@@ -104,7 +118,6 @@ class InferenceJob(Job):
         return tools
 
     def get_answer_info(self, model_id):
-        # Todo: disambiguate the name. Between the client and the ..
         ontologyId = self.lb_client.execute(
             """query modelOntologyPyApi($modelId: ID!){
                 model(where: {id: $modelId}) {ontologyId}}
@@ -310,7 +323,7 @@ class ClassificationInferenceJob(InferenceJob):
                 else:
                     raise ValueError("Only radio and checklists are supported")
 
-    def build_inference_file(self, bucket_name, key):
+    def build_inference_file(self, bucket_name, key) -> str:
         bucket = self.storage_client.get_bucket(bucket_name)
         # Create a blob object from the filepath
         blob = bucket.blob(key)
