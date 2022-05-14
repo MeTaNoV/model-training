@@ -33,7 +33,7 @@ Run ETL jobs, train models, deploy models, and track model performance all from 
 
 ### Deployment
 
-Deploy the coordinator service on port 8000
+Deploy the coordinator service on port 80
 
 1. Create a .env file to keep track of the following env vars (copy .env.example to get started):
     - `DEPLOYMENT_NAME`
@@ -55,7 +55,7 @@ Deploy the coordinator service on port 8000
     - To the cloud: `./deployment/deploy.sh`
     - Locally: `./run.sh`
 4. Test that it is running with:
-    - curl http://ip:8000/ping
+    - curl http://ip/ping
     - ip will be `0.0.0.0` for a local deployment and the remote ip will be printed to the console when you run the deployment script.
     - The server will respond with pong if the deployment was successful
 

@@ -1,11 +1,9 @@
-
 import json
 import argparse
 import logging
 from typing import Optional, Dict, Any
-from collections import defaultdict
 
-from training_lib.errors import InvalidLabelException, InvalidDatasetException
+from training_lib.errors import InvalidLabelException
 from training_lib.storage import get_image_bytes, upload_image_to_gcs
 from training_lib.etl import process_labels_in_threadpool, get_labels_for_model_run, PARTITION_MAPPING, validate_label, \
     validate_vertex_dataset

@@ -15,7 +15,7 @@ then
     gcloud compute instances start $DEPLOYMENT_NAME
 
     DEPLOYMENT_IP=$(gcloud compute instances describe $DEPLOYMENT_NAME --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
-    ENDPOINT=http://$DEPLOYMENT_IP:8000/ping
+    ENDPOINT=http://$DEPLOYMENT_IP/ping
     echo "Waiting for endpoint to become available."
     for i in {1..20}
     do
