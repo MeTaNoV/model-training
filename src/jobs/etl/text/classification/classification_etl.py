@@ -5,7 +5,7 @@ from typing import Literal, Union, Dict, Any
 from collections import Counter
 
 from training_lib.errors import InvalidLabelException
-from training_lib.etl import process_labels_in_threadpool, get_labels_for_model_run, partition_mapping, validate_label, \
+from training_lib.etl import process_labels_in_threadpool, get_labels_for_model_run, PARTITION_MAPPING, validate_label, \
     validate_vertex_dataset
 from training_lib.clients import get_lb_client, get_gcs_client
 from training_lib.storage import upload_ndjson_data, create_gcs_key
@@ -57,7 +57,7 @@ def process_single_classification_label(label: Label,
         'textGcsUri': uri,
         'classificationAnnotation': classification,
         'dataItemResourceLabels': {
-            "aiplatform.googleapis.com/ml_use": partition_mapping[label.extra.get("Data Split")],
+            "aiplatform.googleapis.com/ml_use": PARTITION_MAPPING[label.extra.get("Data Split")],
             "dataRowId": label.data.uid
         }
     }
@@ -96,7 +96,7 @@ def process_multi_classification_label(label: Label,
         'textGcsUri': uri,
         'classificationAnnotations': classifications,
         'dataItemResourceLabels': {
-            "aiplatform.googleapis.com/ml_use": partition_mapping[label.extra.get("Data Split")],
+            "aiplatform.googleapis.com/ml_use": PARTITION_MAPPING[label.extra.get("Data Split")],
             "dataRowId": label.data.uid
         }
     }
