@@ -94,16 +94,30 @@ def _get_display_names_for_label(vertex_label, annotation_name):
     else:
         yield annotation_data['displayName']
 
-def validate_vertex_dataset(vertex_labels, annotation_name, min_labels_per_class = 10, min_classes = None, max_classes = None, min_labels = None):
+def validate_vertex_dataset(vertex_labels,
+                            annotation_name,
+                            min_labels_per_class_train = 10,
+                            min_labels_per_class_test = 2,
+                            min_labels_per_class_val = 2,
+                            min_classes = None,
+                            max_classes = None,
+                            min_labels = None):
     """
     Args:
         vertex_labels : A list of dictionaries in any vertex compatible format
         annotation_name: A string used for looking up the displayName for the annotation
             All vertex annotations have a top level key (annotation_name) that either contains a list of dicts or a dict with a displayName key
-        min_labels_per_class: min number of labels that a class must exist in
+        min_labels_per_class_train: min number of labels that a class must exist in the training set
+        min_labels_per_class_test: min number of labels that a class must exist in the test set
+        min_labels_per_class_val: min number of labels that a class must exist in the val set
         max_classes: Max total classes in the entire dataset
         min_labels: Minimum number of labels
     """
+    min_labels_lookup = {
+        'train' : min_labels_per_class_train,
+        'test' : min_labels_per_class_test,
+        'validation' : min_labels_per_class_val
+    }
 
     class_counts = {partition: Counter() for partition in PARTITION_MAPPING.values()}
     for vertex_label in vertex_labels:
@@ -113,7 +127,7 @@ def validate_vertex_dataset(vertex_labels, annotation_name, min_labels_per_class
 
     for partition in class_counts:
         for class_name, example_count in class_counts[partition].items():
-            if example_count < min_labels_per_class:
+            if example_count < min_labels_lookup[partition]:
                 raise InvalidDatasetException(
                     f"Not enough examples for `{class_name}` in the {partition} partition. Expected {min_labels_per_class}, Found {example_count}"
                 )

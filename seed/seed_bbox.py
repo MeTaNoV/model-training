@@ -14,20 +14,17 @@ def load_labels():
 
 def generate_annotations(project, dataset):
     labels = load_labels()
-    new_labels = LabelList()
-    for copy in range(4):
-        for label in labels:
-            annots = label.annotations
-            for annotation in annots:
-                annotation.feature_schema_id = None
 
-            new_label = label.copy(deep = True)
-            external_id = f"{copy}_{label.data.external_id.split('/')[-1]}"
-            new_label.data.uid = dataset.data_row_for_external_id(external_id).uid
-            new_labels.append(new_label)
+    for label in labels:
+        annots = label.annotations
+        for annotation in annots:
+            annotation.feature_schema_id = None
 
-    new_labels.assign_feature_schema_ids(OntologyBuilder().from_project(project))
-    return list(NDJsonConverter.serialize(new_labels))
+        external_id = f"{label.data.external_id.split('/')[-1]}"
+        label.data.uid = dataset.data_row_for_external_id(external_id).uid
+
+    labels.assign_feature_schema_ids(OntologyBuilder().from_project(project))
+    return list(NDJsonConverter.serialize(labels))
 
 def create_ontology(client):
     ontology_builder = OntologyBuilder()
@@ -38,13 +35,11 @@ def create_ontology(client):
 def append_data_rows(dataset):
     datarows = []
     # filenames are 0 to 259 .jpg
-    for copy in range(4):
-        for image_idx in range(259):
-            datarows.append({
-                DataRow.row_data: f"https://storage.googleapis.com/vertex-matt-test/bbox_seed_datarows/{image_idx}.jpg",
-                DataRow.external_id: f"{copy}_{image_idx}.jpg"
-            })
-
+    for image_idx in range(259):
+        datarows.append({
+            DataRow.row_data: f"https://storage.googleapis.com/vertex-matt-test/bbox_seed_datarows/{image_idx}.jpg",
+            DataRow.external_id: f"{image_idx}.jpg"
+        })
     task = dataset.create_data_rows(datarows)
     task.wait_till_done()
 
