@@ -1,20 +1,19 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Callable, Optional, Union, Literal, Dict, Any
 import logging
-import json
-from collections import defaultdict
+from collections import Counter
 
 from training_lib.errors import InvalidDataRowException, InvalidLabelException, InvalidDatasetException
 
 from labelbox.data.serialization import LBV1Converter
-from labelbox.data.annotation_types import Label, LabelGenerator
+from labelbox.data.annotation_types import Label
 import labelbox
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Mapping from labelbox partition names to vertex names
-partition_mapping = {
+PARTITION_MAPPING = {
     'training': 'train',
     'test': 'test',
     'validation': 'validation'
@@ -106,7 +105,7 @@ def validate_vertex_dataset(vertex_labels, annotation_name, min_labels_per_class
         min_labels: Minimum number of labels
     """
 
-    class_counts = {partition: defaultdict(lambda: 0) for partition in partition_mapping.values()}
+    class_counts = {partition: Counter() for partition in PARTITION_MAPPING.values()}
     for vertex_label in vertex_labels:
         partition = vertex_label['dataItemResourceLabels']['aiplatform.googleapis.com/ml_use']
         for display_name in _get_display_names_for_label(vertex_label, annotation_name):

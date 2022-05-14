@@ -7,7 +7,7 @@ from collections import defaultdict
 from training_lib.errors import InvalidLabelException, InvalidDatasetException
 from training_lib.storage import upload_image_to_gcs, upload_ndjson_data,  \
     create_gcs_key, get_image_bytes
-from training_lib.etl import process_labels_in_threadpool, get_labels_for_model_run, partition_mapping, validate_label, \
+from training_lib.etl import process_labels_in_threadpool, get_labels_for_model_run, PARTITION_MAPPING, validate_label, \
     validate_vertex_dataset
 from training_lib.clients import get_lb_client, get_gcs_client
 
@@ -54,7 +54,7 @@ def process_single_classification_label(label: Label,
         'imageGcsUri': gcs_uri,
         'classificationAnnotation': classification,
         'dataItemResourceLabels': {
-            "aiplatform.googleapis.com/ml_use": partition_mapping[label.extra.get("Data Split")],
+            "aiplatform.googleapis.com/ml_use": PARTITION_MAPPING[label.extra.get("Data Split")],
             "dataRowId": label.data.uid
         }
     }
@@ -94,7 +94,7 @@ def process_multi_classification_label(label: Label,
         'imageGcsUri': gcs_uri,
         'classificationAnnotations': classifications,
         'dataItemResourceLabels': {
-            "aiplatform.googleapis.com/ml_use": partition_mapping[label.extra.get("Data Split")],
+            "aiplatform.googleapis.com/ml_use": PARTITION_MAPPING[label.extra.get("Data Split")],
             "dataRowId": label.data.uid
         }
     }

@@ -9,7 +9,7 @@ from labelbox.data.annotation_types import Label
 
 from training_lib.clients import get_lb_client, get_gcs_client
 from training_lib.errors import InvalidLabelException
-from training_lib.etl import get_labels_for_model_run, process_labels_in_threadpool, partition_mapping, validate_label, \
+from training_lib.etl import get_labels_for_model_run, process_labels_in_threadpool, PARTITION_MAPPING, validate_label, \
     validate_vertex_dataset
 from training_lib.storage import upload_ndjson_data, create_gcs_key
 
@@ -59,7 +59,7 @@ def process_label(label: Label) -> Dict[str, Any]:
         # Note that this always uploads the text data in-line
         "textContent": label.data.value,
         'dataItemResourceLabels': {
-            "aiplatform.googleapis.com/ml_use": partition_mapping[label.extra.get("Data Split")],
+            "aiplatform.googleapis.com/ml_use": PARTITION_MAPPING[label.extra.get("Data Split")],
             "dataRowId": label.data.uid
         }
     }

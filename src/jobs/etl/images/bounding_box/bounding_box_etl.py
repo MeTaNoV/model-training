@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 
 from training_lib.errors import InvalidLabelException
 from training_lib.storage import get_image_bytes, upload_image_to_gcs
-from training_lib.etl import process_labels_in_threadpool, get_labels_for_model_run, partition_mapping, validate_label, \
+from training_lib.etl import process_labels_in_threadpool, get_labels_for_model_run, PARTITION_MAPPING, validate_label, \
     validate_vertex_dataset
 from training_lib.clients import get_lb_client, get_gcs_client
 from training_lib.storage import upload_ndjson_data, create_gcs_key
@@ -96,7 +96,7 @@ def process_label(label: Label, bucket: Bucket, downsample_factor: int = 4) -> O
         'boundingBoxAnnotations':
             bounding_box_annotations,
         'dataItemResourceLabels': {
-            "aiplatform.googleapis.com/ml_use": partition_mapping[label.extra.get("Data Split")],
+            "aiplatform.googleapis.com/ml_use": PARTITION_MAPPING[label.extra.get("Data Split")],
             "dataRowId": label.data.uid,
     }}
 
@@ -140,6 +140,3 @@ if __name__ == '__main__':
     parser.add_argument('--gcs_key', type=str, required=False, default=None)
     args = parser.parse_args()
     main(**vars(args))
-
-
-
