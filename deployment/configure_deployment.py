@@ -24,7 +24,7 @@ try:
     # If either of these are true then just create a new bucket
     if bucket.location_type != 'region':
         raise ValueError(
-            f"Bucket location type must be `region`. Provided bucket `{bucket_name}` has location type `{bucket.location}`"
+            f"Bucket location type must be `region`. Provided bucket `{bucket_name}` has location type `{bucket.location_type}`"
         )
 
     if bucket.location != 'US-CENTRAL1':

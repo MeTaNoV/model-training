@@ -17,7 +17,6 @@ logger = logging.getLogger("uvicorn")
 
 
 class NERETL(Job):
-
     def __init__(self, deployment_name: str, gcs_bucket: str,
                  service_account_email: str, google_cloud_project: str):
         self.gcs_bucket = gcs_bucket
@@ -41,7 +40,7 @@ class NERETL(Job):
             service_account=self.service_account_email,
             environment_variables={'GOOGLE_PROJECT': self.google_cloud_project})
         return JobStatus(JobState.SUCCESS,
-                         result=f'gs://{self.gcs_bucket}/{gcs_key}')
+                         result={'etl_file' : f'gs://{self.gcs_bucket}/{gcs_key}'})
 
 
 class NERTraining(Job):
@@ -87,7 +86,7 @@ class NERInference(InferenceJob):
         # Keeping it here for now since the inferences are still run as a separate job
         super().__init__(lb_api_key)
 
-    def build_inference_file(self, bucket_name, key):
+    def build_inference_file(self, bucket_name : str, key : str) -> str:
         bucket = self.storage_client.get_bucket(bucket_name)
         # Create a blob object from the filepath
         blob = bucket.blob(key)
@@ -197,27 +196,19 @@ class NERPipeline(Pipeline):
     def run(self, json_data):
         model_run_id, job_name = self.parse_args(json_data)
         self.update_status(PipelineState.PREPARING_DATA, model_run_id)
-        etl_status = self.run_job(
-            model_run_id, lambda: self.etl_job.run(model_run_id, job_name))
-        if etl_status is None:
-            return
+
+        etl_status = self.etl_job.run(model_run_id, job_name)
         self.update_status(PipelineState.TRAINING_MODEL,
                            model_run_id,
-                           metadata={'training_data_input': etl_status.result})
+                           metadata={'training_data_input': etl_status.result['etl_file']})
 
-        training_status = self.run_job(
-            model_run_id,
-            lambda: self.training_job.run(etl_status.result, job_name))
-        if training_status is None:
-            return
+        training_status = self.training_job.run(etl_status.result['etl_file'], job_name)
         self.update_status(
             PipelineState.TRAINING_MODEL,
             model_run_id,
             metadata={'model_id': training_status.result['model'].name})
 
-        inference_status = self.run_job(
-            model_run_id, lambda: self.inference.run(
-                etl_status.result, model_run_id, training_status.result[
-                    'model'], job_name))
-        if inference_status is not None:
-            self.update_status(PipelineState.COMPLETE, model_run_id)
+        self.inference.run(
+                etl_status.result['etl_file'], model_run_id, training_status.result[
+                    'model'], job_name)
+        self.update_status(PipelineState.COMPLETE, model_run_id)

@@ -57,7 +57,7 @@ def get_image_bytes(image_url: str, downsample_factor = 1.) -> Optional[Tuple[Im
                 image_bytes = image_to_bytes(resized_image)
                 return image_bytes, (w,h)
     except DecompressionBombError:
-        raise InvalidDataRowException(f"Image to large : `{image_url}`.")
+        raise InvalidDataRowException(f"Image too large : `{image_url}`.")
     except:
         raise InvalidDataRowException(f"Unable to fetch image : `{image_url}`.")
 

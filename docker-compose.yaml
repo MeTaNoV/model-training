@@ -3,8 +3,8 @@ version: '3.7'
 services:
   coordinator:
     build:
-      context: ./src/coordinator/
-      dockerfile: Dockerfile
+      context: ./src/
+      dockerfile: coordinator/Dockerfile
       args:
           GCS_BUCKET: ${GCS_BUCKET}
           GOOGLE_PROJECT: ${GOOGLE_PROJECT}
@@ -19,7 +19,7 @@ services:
         source: ${GOOGLE_APPLICATION_CREDENTIALS}
         target: ${GOOGLE_APPLICATION_CREDENTIALS}
     ports:
-      - 8000:8000
+      - 80:80
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
 
