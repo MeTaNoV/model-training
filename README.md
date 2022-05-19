@@ -128,3 +128,14 @@ Key terms:
 * To run any of the seed scripts you can use the `seed.sh` script. It will run any of the python script in a docker container
     * Run: `./seed.sh <script>.py`
     * Once the data is seeded you can test against a local or live deployment of the coordinator
+
+
+### HTTPS
+
+* By default, the service uses http. To support https, you must have a domain name and an SSL certificate from a certificate authority. Once you have the certificate you can either directly update the service to use https or configure a reverse proxy with https. To update the service to use https, simply provide the ssl_keyfile and ssl_certfile params to app.run() at the bottom of coordinator.py. 
+ If you directly update the server to use https you might want to change the default port to 443. You can change this in app.run(), the deployment script (update the firewall), and docker-compose (for local usage)
+
+
+### M1 Mac
+* Images built for arm64 architectures cannot be run on google cloud. To fix this issue, you must build your containers to run on amd64 architectures. Before building any containers or running the deploy script run the following:
+`export DOCKER_DEFAULT_PLATFORM=linux/amd64`
