@@ -64,6 +64,7 @@ def main(client):
                                       annotations)
 
     errors = job.errors
+
     if not len(errors):
         print("Successfully uploaded")
         lb_model = client.create_model(name=f"bounding_box_model",
@@ -73,7 +74,7 @@ def main(client):
         print("Upload contained errors: ", errors)
 
 if __name__ == '__main__':
-    client = Client()
+    client = client = Client()
     main(client)
 
 
