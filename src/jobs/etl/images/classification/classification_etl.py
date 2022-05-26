@@ -2,9 +2,8 @@ import json
 import argparse
 import logging
 from typing import Literal, Union, Dict, Any
-from collections import defaultdict
 
-from training_lib.errors import InvalidLabelException, InvalidDatasetException
+from training_lib.errors import InvalidLabelException
 from training_lib.storage import upload_image_to_gcs, upload_ndjson_data,  \
     create_gcs_key, get_image_bytes
 from training_lib.etl import process_labels_in_threadpool, get_labels_for_model_run, PARTITION_MAPPING, validate_label, \

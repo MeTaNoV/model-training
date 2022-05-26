@@ -24,10 +24,14 @@ def validate_label(label: Label) -> None:
     """
     Checks if a label has the required fields for any etl pipeline.
     """
-    if label.extra.get("Data Split") is None:
+    data_split = label.extra.get("Data Split")
+    if data_split is None:
         raise InvalidLabelException(f"No data split assigned to label `{label.uid}`.")
+    elif data_split not in PARTITION_MAPPING:
+        raise InvalidLabelException(f"Unexpected data partition. Found `{data_split}`, expected one of `{PARTITION_MAPPING.keys()}`")
     if not len(label.annotations):
         raise InvalidLabelException(f"No annotations found for label `{label.uid}`.")
+
 
 
 def process_labels_in_threadpool(process_fn: Callable[..., Dict[str, Any]],labels: List[Label], *args, max_workers = 8) -> List[Dict[str, Any]]:
@@ -129,7 +133,7 @@ def validate_vertex_dataset(vertex_labels,
         for class_name, example_count in class_counts[partition].items():
             if example_count < min_labels_lookup[partition]:
                 raise InvalidDatasetException(
-                    f"Not enough examples for `{class_name}` in the {partition} partition. Expected {min_labels_per_class}, Found {example_count}"
+                    f"Not enough examples for `{class_name}` in the {partition} partition. Expected {min_labels_lookup[partition]}, Found {example_count}"
                 )
 
     for partition in class_counts:
@@ -139,4 +143,4 @@ def validate_vertex_dataset(vertex_labels,
             raise InvalidDatasetException(f"Must provide at no more than {max_classes} classes. Partition {partition} had {len(class_counts[partition])}")
 
     if min_labels is not None and  len(vertex_labels) < min_labels:
-        raise InvalidLabelException(f"Must provide at least {min_labels} complete labels. Found {len(vertex_labels)}")
+        raise InvalidDatasetException(f"Must provide at least {min_labels} complete labels. Found {len(vertex_labels)}")
