@@ -54,6 +54,8 @@ def get_image_bytes(image_url: str, downsample_factor = 1.) -> Optional[Tuple[Im
         with _download_image(image_url) as image:
             w,h = image.size
             with image.resize((int(w *  1./downsample_factor), int(h * 1./downsample_factor))) as resized_image:
+                if resized_image.mode == 'RGBA':
+                    resized_image = resized_image.convert('RGB')
                 image_bytes = image_to_bytes(resized_image)
                 return image_bytes, (w,h)
     except DecompressionBombError:
