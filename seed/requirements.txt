@@ -1,4 +1,5 @@
 labelbox[data]
+shapely==1.8.5
 tensorflow
 tensorflow_datasets
 datasets
