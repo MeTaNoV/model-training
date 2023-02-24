@@ -15,7 +15,7 @@ print(f"Organization Name: {organization.name}")
 print(f"User Email : {user.email}")
 
 bucket_name = os.environ['GCS_BUCKET']
-storage_client = storage.Client()
+storage_client = storage.Client(os.environ['GOOGLE_PROJECT'])
 
 
 try:
