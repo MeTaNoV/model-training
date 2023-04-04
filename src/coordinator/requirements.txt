@@ -3,6 +3,6 @@ fastapi[all]
 google-cloud-storage
 google-cloud-aiplatform==1.11.0
 google-cloud-secret-manager
-labelbox[data]
 ndjson
 shapely==1.8.5
+labelbox[data]
