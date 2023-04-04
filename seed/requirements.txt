@@ -1,7 +1,7 @@
-labelbox[data]
 shapely==1.8.5
 tensorflow
 tensorflow_datasets
 datasets
 scipy
 google-cloud-aiplatform==1.11.0
+labelbox[data]
