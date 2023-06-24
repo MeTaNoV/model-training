@@ -9,8 +9,8 @@ read -p "Do you want to proceed? (y/N)" -n 1 -r
 
 if [[ $REPLY =~ ^[Yy]$ ]]
 then
-    docker-compose build coordinator
-    docker-compose push coordinator
+    docker compose build coordinator
+    docker compose push coordinator
     gcloud compute instances stop $DEPLOYMENT_NAME
     gcloud compute instances start $DEPLOYMENT_NAME
 

@@ -20,9 +20,9 @@ Run ETL jobs, train models, deploy models, and track model performance all from 
 2. Download the private key for the service account
     * Put it anywhere on your computer
     * Set the GOOGLE_APPLICATION_CREDENTIALS to point to it. `export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/model-training-credentials.json`
-3. docker and docker-compose installed
+3. docker and docker compose v2 installed
     * https://docs.docker.com/compose/install/
-    * https://docs.docker.com/get-docker/ (not required for mac since docker and docker-compose are available together in the first link).
+    * https://docs.docker.com/get-docker/ (not required for mac since docker and docker compose v2 are available together in the first link).
 4. gcloud cli installed (and configured for the proper service account)
     * Run `curl https://sdk.cloud.google.com | bash` to install
     * `source ~/.<bash_profile/zshrc/bashrc>` to load env vars
@@ -79,7 +79,7 @@ Deploy the coordinator service on port 80
 
 * Updating containerized jobs
     - The training pipeline always uses the latest images. This means that anytime you build and push, the coordinator will use the pushed code automatically. <b>Do not push containers to GCR for a deployment that is being used in production unless you want those changes to be used</b>/.
-    - Update your code locally, run `docker-compose build <container_name>`, and then `docker-compose push <container_name>`.
+    - Update your code locally, run `docker compose build <container_name>`, and then `docker compose push <container_name>`.
 
 
 
@@ -133,7 +133,7 @@ Key terms:
 ### HTTPS
 
 * By default, the service uses http. To support https, you must have a domain name and an SSL certificate from a certificate authority. Once you have the certificate you can either directly update the service to use https or configure a reverse proxy with https. To update the service to use https, simply provide the ssl_keyfile and ssl_certfile params to app.run() at the bottom of coordinator.py. 
- If you directly update the server to use https you might want to change the default port to 443. You can change this in app.run(), the deployment script (update the firewall), and docker-compose (for local usage)
+ If you directly update the server to use https you might want to change the default port to 443. You can change this in app.run(), the deployment script (update the firewall), and docker compose (for local usage)
 
 
 ### M1 Mac

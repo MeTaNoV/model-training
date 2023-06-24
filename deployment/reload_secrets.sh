@@ -13,7 +13,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]
 then
     gcloud -q secrets delete ${DEPLOYMENT_NAME}_service_secret
     gcloud -q secrets delete ${DEPLOYMENT_NAME}_labelbox_api_key
-    docker-compose run deployment_config
+    docker compose run deployment_config
     gcloud -q compute instances stop --zone=us-central1-a $DEPLOYMENT_NAME
     gcloud -q compute instances start --zone=us-central1-a $DEPLOYMENT_NAME
     DEPLOYMENT_IP=$(gcloud compute instances describe $DEPLOYMENT_NAME --format='get(networkInterfaces[0].accessConfigs[0].natIP)')

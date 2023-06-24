@@ -49,11 +49,11 @@ enable_service secretmanager.googleapis.com
 enable_service storage.googleapis.com
 
 # Build Containers
-docker-compose build
-docker-compose push
+docker compose build
+docker compose push
 
 # Configure storage and secrets
-docker-compose run deployment_config
+docker compose run deployment_config
 
 # Create Ingress
 gcloud compute firewall-rules create $FIREWALL_NAME \
